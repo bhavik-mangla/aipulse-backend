@@ -1,0 +1,20 @@
+{
+    email {$ADMIN_EMAIL:info@govnotify.in}
+}
+
+:80 {
+    # Serve static files from the mounted volume
+    root * /usr/share/caddy
+    file_server
+
+    # Proxy API requests to the api service
+    reverse_proxy /api/* api:8000
+    
+    # Optional: Enable compression
+    encode zstd gzip
+    
+    # Optional: Log requests
+    log {
+        output file /data/caddy.log
+    }
+}

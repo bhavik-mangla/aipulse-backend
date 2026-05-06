@@ -1,0 +1,139 @@
+version: '3.9'
+
+services:
+  # Application
+  api:
+    build: .
+    command: uvicorn govnotify.main:app --host 0.0.0.0 --port 8000 --workers 1
+    shm_size: '2gb'
+    # Removed ports: - "8000:8000" (Caddy will proxy)
+    env_file: .env
+    environment:
+      PYTHONPATH: /app/src
+      PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: "True"
+      PADDLE_USE_MKLDNN: "False"
+      FLAGS_enable_pir_api: "0"
+      FLAGS_use_mkldnn: "0"
+      OMP_NUM_THREADS: "1"
+      TESSDATA_PREFIX: "/usr/share/tesseract-ocr/5/tessdata"
+    depends_on:
+      - postgres
+      - qdrant
+      - redis
+    volumes:
+      - .:/app
+    restart: unless-stopped
+
+  # Celery Workers
+  celery-worker:
+    build: .
+    command: celery -A govnotify.tasks.celery_app worker --loglevel=info --concurrency=1
+    shm_size: '2gb'
+    depends_on:
+      - postgres
+      - qdrant
+      - redis
+    volumes:
+      - .:/app
+    env_file: .env
+    environment:
+      PYTHONPATH: /app/src
+      PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: "True"
+      PADDLE_USE_MKLDNN: "False"
+      FLAGS_enable_pir_api: "0"
+      FLAGS_use_mkldnn: "0"
+      OMP_NUM_THREADS: "1"
+      TESSDATA_PREFIX: "/usr/share/tesseract-ocr/5/tessdata"
+    restart: unless-stopped
+
+  # Celery Beat (Scheduler)
+  celery-beat:
+    build: .
+    command: celery -A govnotify.tasks.celery_app beat --loglevel=info
+    depends_on:
+      - redis
+    volumes:
+      - .:/app
+    env_file: .env
+    environment:
+      PYTHONPATH: /app/src
+      PADDLE_PDX_DISABLE_MODEL_SOURCE_CHECK: "True"
+      PADDLE_USE_MKLDNN: "False"
+      DISABLE_PADDLEOCR: "True"
+      TESSDATA_PREFIX: "/usr/share/tesseract-ocr/5/tessdata"
+    restart: unless-stopped
+
+  # Databases
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: govnotify
+      POSTGRES_USER: govnotify
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+    # Removed ports: - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U govnotify"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.12.0
+    # Removed ports: - "6333:6333", - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    environment:
+      QDRANT_SERVICE_GRPC_PORT: 6334
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    # Removed ports: - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # Reverse Proxy
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "8080:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./static:/usr/share/caddy
+      - caddy_data:/data
+      - caddy_config:/config
+    env_file: .env
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  # Monitoring
+  flower:
+    build: .
+    command: celery -A govnotify.tasks.celery_app flower --port=5555
+    # Flower can be exposed directly or proxied. For now keeping it private.
+    env_file: .env
+    depends_on:
+      - redis
+    volumes:
+      - .:/app
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  redis_data:
+  caddy_data:
+  caddy_config:
+

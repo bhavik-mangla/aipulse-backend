@@ -1,0 +1,46 @@
+[project]
+name = "govnotify"
+version = "0.1.0"
+description = "Indian Government Notification Platform"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.135.3",
+    "uvicorn[standard]>=0.44.0",
+    "pydantic[email]>=2.13.0",
+    "pydantic-settings>=2.8.0",
+    "sqlalchemy[asyncio]>=2.0.49",
+    "asyncpg>=0.31.0",
+    "alembic>=1.18.4",
+    "redis>=6.2.0",
+    "celery[redis]>=5.6.3",
+    "structlog>=25.5.0",
+    "httpx[socks]>=0.28.1",
+    "feedparser>=6.0.12",
+    "crawl4ai>=0.5.0,<0.8.6",
+    "litellm>=1.80.0,<1.81.0",
+    "PyJWT[crypto]>=2.10.0",
+    "bcrypt>=4.3.0",
+    "qdrant-client>=1.17.1",
+    "fastembed>=0.8.0",
+    "datasketch>=1.9.0",
+    "pdfplumber>=0.11.9",
+    "pymupdf>=1.24.9,<1.25.0",
+    "trafilatura>=2.0.0",
+    "beautifulsoup4>=4.14.3",
+    "lingua-language-detector>=2.2.0",
+    "python-telegram-bot>=22.7",
+    "croniter>=6.2.2",
+    "paddleocr>=2.7.3",
+    "paddlepaddle>=2.6.2",
+    "numpy<2.0.0",
+    "layoutparser[layoutmodels,tesseract]>=0.3.4",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["govnotify*"]
