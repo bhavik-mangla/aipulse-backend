@@ -18,7 +18,7 @@ PROXY_LIST_URLS = [
     "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt",
     "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks4.txt",
     "https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/socks5.txt",
-    "https://raw.githubusercontent.com/oxylabs/free-proxy-list/master/proxies.txt",
+    "https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/all.txt",
 ]
 
 class ProxyManager:

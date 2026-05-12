@@ -41,7 +41,7 @@ class MCASource(WebScrapeSource):
             name="MCA Updates",
             url="https://www.mca.gov.in/content/mca/global/en/acts-rules/ebooks/notifications.html",
             source_type=SourceType.WEB_SCRAPE,
-            schedule_cron="0 */12 * * *",
+            schedule_cron="0 18 * * *",
             region_tags=["national"],
             language="en",
             crawler_class="govnotify.sources.mca_source.MCASource",

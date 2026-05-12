@@ -35,7 +35,7 @@ class PIBSource(WebScrapeSource):
             name="PIB Press Releases",
             url=PIB_FEED_URL,
             source_type=SourceType.RSS,
-            schedule_cron="0 */12 * * *",
+            schedule_cron="0 18 * * *",
             region_tags=["national"],
             language="en",
             crawler_class="govnotify.crawlers.rss_crawler.RSSCrawler",

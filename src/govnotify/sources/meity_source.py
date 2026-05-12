@@ -30,7 +30,7 @@ class MeitYSource(WebScrapeSource):
             name="MeitY",
             url=MEITY_ORDERS_URL,
             source_type=SourceType.WEB_SCRAPE,
-            schedule_cron="0 */12 * * *",
+            schedule_cron="0 18 * * *",
             region_tags=["national"],
             language="en",
             crawler_class="crawl4ai",

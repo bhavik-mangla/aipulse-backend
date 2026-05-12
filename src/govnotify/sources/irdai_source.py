@@ -34,7 +34,7 @@ class IRDAISource(WebScrapeSource):
             name="IRDAI Updates",
             url=IRDAI_WHATS_NEW_URL,
             source_type=SourceType.WEB_SCRAPE,
-            schedule_cron="0 */12 * * *",
+            schedule_cron="0 18 * * *",
             region_tags=["national"],
             language="en",
             crawler_class="govnotify.sources.irdai_source.IRDAISource",

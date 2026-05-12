@@ -44,7 +44,7 @@ class IncomeTaxSource(WebScrapeSource):
             name="Income Tax Notifications & Circulars",
             url=f"{INCOME_TAX_BASE_URL}/notifications",
             source_type=SourceType.WEB_SCRAPE,
-            schedule_cron="0 */12 * * *",
+            schedule_cron="0 18 * * *",
             region_tags=["national"],
             language="en",
             crawler_class="govnotify.crawlers.base.BaseCrawler", # Using base as we use direct API

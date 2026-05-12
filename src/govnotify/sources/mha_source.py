@@ -33,7 +33,7 @@ class MHASource(WebScrapeSource):
             name="Ministry of Home Affairs",
             url=MHA_WHATS_NEW_URL,
             source_type=SourceType.WEB_SCRAPE,
-            schedule_cron="0 */12 * * *",
+            schedule_cron="0 18 * * *",
             region_tags=["national"],
             language="en",
             crawler_class="govnotify.crawlers.crawl4ai_crawler.Crawl4AICrawler",

@@ -122,7 +122,7 @@ class WebScrapeSource(AbstractSource, ABC):
                 self._client = None
 
     async def _get(self, url: str, **kwargs) -> httpx.Response:
-        """Rate-limited GET request with proxy fallback and UA rotation on retry."""
+        """Rate-limited GET request with proxy rotation and smart fallback."""
         from govnotify.sources.proxy_manager import proxy_manager
         
         max_retries = kwargs.pop("max_retries", 3)
@@ -132,38 +132,38 @@ class WebScrapeSource(AbstractSource, ABC):
         last_exc = None
         for attempt in range(max_retries):
             current_headers = {**self._headers, **kwargs.get("headers", {})}
-            # Rotate User-Agent on retries to look like a different client
+            # Rotate User-Agent on retries
             if attempt > 0:
                 current_headers["User-Agent"] = get_standard_headers()["User-Agent"]
             
             try:
                 async with self._rate_limiter:
-                    # Use existing session if no proxy is needed and session exists
-                    if self._client and not use_proxy:
-                        resp = await self._client.get(url, headers=current_headers, **kwargs)
-                    else:
-                        # Create a transient client, potentially with a proxy
-                        proxy = None
-                        if use_proxy:
-                            proxy = await proxy_manager.get_proxy()
-                            logger.info("using_proxy_fallback", url=url, proxy=proxy, attempt=attempt+1)
-                        
-                        client_kwargs = {
-                            "follow_redirects": True,
-                            "timeout": 30.0,
-                            "headers": current_headers,
-                            "http2": not use_proxy, # Disable HTTP/2 when using free proxies as many don't support it
-                        }
+                    # Logic:
+                    # 1. First attempt: Direct (unless use_proxy is forced)
+                    # 2. Subsequent attempts: Try different proxies
+                    # 3. Final attempt: Try direct as a last resort
+                    
+                    proxy = None
+                    if use_proxy or (attempt > 0 and attempt < max_retries - 1):
+                        proxy = await proxy_manager.get_proxy()
                         if proxy:
-                            client_kwargs["proxy"] = proxy
-                            
-                        async with httpx.AsyncClient(**client_kwargs) as client:
-                            resp = await client.get(url, **kwargs)
+                            logger.info("using_proxy_retry", url=url, proxy=proxy, attempt=attempt+1)
+                    
+                    client_kwargs = {
+                        "follow_redirects": True,
+                        "timeout": 30.0,
+                        "headers": current_headers,
+                        "http2": not proxy, # Disable HTTP/2 for free proxies
+                    }
+                    if proxy:
+                        client_kwargs["proxy"] = proxy
+                        
+                    async with httpx.AsyncClient(**client_kwargs) as client:
+                        resp = await client.get(url, **kwargs)
                     
                     if resp.status_code in (429, 503, 418):
                         self._rate_limiter.backoff(attempt + 1)
-                        # Trigger proxy fallback on next attempt for these specific codes
-                        use_proxy = True
+                        use_proxy = True # Force proxy on next attempt
                     
                     resp.raise_for_status()
                     return resp
@@ -172,7 +172,12 @@ class WebScrapeSource(AbstractSource, ABC):
                 last_exc = exc
                 status_code = getattr(exc.response, 'status_code', None) if isinstance(exc, httpx.HTTPStatusError) else None
                 
-                # These codes or connection errors trigger a proxy fallback
+                error_msg = str(exc).lower()
+                # If we get a "Malformed reply" while using a proxy, it means the PROXY is bad.
+                # We should continue to next retry to get a DIFFERENT proxy.
+                if "malformed reply" in error_msg and proxy:
+                    logger.warning("bad_proxy_detected_malformed_reply", url=url, proxy=proxy)
+                
                 is_retryable = (
                     not isinstance(exc, httpx.HTTPStatusError) or 
                     status_code in (418, 429, 403, 503) or 
@@ -183,8 +188,8 @@ class WebScrapeSource(AbstractSource, ABC):
                     logger.error("non_retryable_error", url=url, status=status_code, error=str(exc))
                     break
                 
-                # If we hit a block or connection error, enable proxy for next attempt
-                if status_code in (418, 429, 403) or not isinstance(exc, httpx.HTTPStatusError):
+                # If blocked, enable proxy for next attempt
+                if status_code in (418, 429, 403):
                     use_proxy = True
                 
                 wait_time = backoff_factor ** attempt
