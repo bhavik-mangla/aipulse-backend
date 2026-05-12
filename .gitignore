@@ -175,3 +175,5 @@ tesseract_output.txt
 sample_digest_*.html
 docker_paddle_*.txt
 celerybeat-schedule
+.vercel
+.env*.local
