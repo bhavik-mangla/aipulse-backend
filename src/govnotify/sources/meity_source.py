@@ -15,7 +15,6 @@ from bs4 import BeautifulSoup
 from govnotify.models.source import RawDocument, SourceConfig, SourceType
 from govnotify.sources.registry import SourceRegistry
 from govnotify.sources.base import WebScrapeSource
-from govnotify.sources.utils import parse_indian_date
 
 logger = structlog.get_logger(__name__)
 
@@ -47,29 +46,16 @@ class MeitYSource(WebScrapeSource):
         
         pages = self._config.crawler_config.get("pages", 3)
         
-        # Comprehensive headers for fallback
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-        }
-
         async with AsyncWebCrawler() as crawler:
             for page in range(1, pages + 1):
                 url = f"{MEITY_ORDERS_URL}?page={page}&target_lang=en"
                 logger.info("meity_crawling_page", page=page)
                 
                 config = CrawlerRunConfig(
-                    wait_for="css:body",
+                    wait_for="css:.announcementbox, .views-table",
                     cache_mode=CacheMode.BYPASS,
-                    page_timeout=60000,
-                    user_agent=headers["User-Agent"]
+                    page_timeout=60000
                 )
-                
-                # Add a small random delay to avoid detection
-                import asyncio
-                import random
-                await asyncio.sleep(random.uniform(2, 5))
                 
                 result = await crawler.arun(url=url, config=config)
                 
@@ -78,7 +64,7 @@ class MeitYSource(WebScrapeSource):
                     logger.warning("meity_page_failed_crawl4ai", page=page, err=result.error_message)
                     # FALLBACK: Try direct httpx if Crawl4AI is blocked
                     try:
-                        resp = await self._get(url, headers=headers)
+                        resp = await self._get(url)
                         html = resp.text
                         logger.info("meity_fallback_httpx_success", page=page)
                     except Exception as e:
@@ -122,35 +108,33 @@ class MeitYSource(WebScrapeSource):
         entries = []
         soup = BeautifulSoup(html, 'html.parser')
         
-        # 1. Try views-table (Primary for rendered and some raw HTML)
-        table = soup.find('table', class_=re.compile(r'views-table|table'))
+        # Try views-table first
+        table = soup.find('table', class_='views-table')
         if table:
-            for row in table.find_all('tr'):
+            for row in table.find_all('tr')[1:]:
                 link = row.find('a', href=re.compile(r'\.pdf$', re.IGNORECASE))
                 if not link: continue
                 
-                title = link.get_text(strip=True) or row.get_text(strip=True)
+                title = link.get_text(strip=True)
                 full_url = urljoin(current_url, link.get('href'))
                 
                 entries.append({
-                    "title": title[:500],
+                    "title": title,
                     "url": full_url,
                 })
 
-        # 2. Try announcementbox or generic list items
+        # Try announcementbox
         if not entries:
-            # Look for generic links to PDFs in any list-like structure
-            for link in soup.find_all('a', href=re.compile(r'\.pdf$', re.IGNORECASE)):
-                parent = link.find_parent(['div', 'li', 'td'])
-                title = link.get_text(strip=True)
-                if not title and parent:
-                    title = parent.get_text(strip=True)
+            for box in soup.select('.announcementbox'):
+                title_p = box.find('p')
+                link = box.find('a', href=re.compile(r'\.pdf$', re.IGNORECASE))
+                if not link or not title_p: continue
                 
-                if not title: title = "MeitY Document"
-                
+                title = title_p.get_text(strip=True)
                 full_url = urljoin(current_url, link.get('href'))
+                
                 entries.append({
-                    "title": title[:500],
+                    "title": title,
                     "url": full_url,
                 })
 
