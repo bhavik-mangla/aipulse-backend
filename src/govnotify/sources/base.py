@@ -203,7 +203,7 @@ class WebScrapeSource(AbstractSource, ABC):
         ) from last_exc
 
     async def _fetch_pdf_content(self, url: str, title: str = "", **kwargs) -> str:
-        """Download and extract text from a PDF, with early deduplication check."""
+        """Download and extract text from a PDF, with early deduplication check and HTML fallback."""
         if title:
             # Check if title already exists before downloading PDF
             partial_doc = self.create_raw_document(title=title, fetch_url=url, raw_content=title)
@@ -214,6 +214,13 @@ class WebScrapeSource(AbstractSource, ABC):
 
         try:
             resp = await self._get(url, **kwargs)
+            content_type = resp.headers.get("Content-Type", "").lower()
+            
+            # If we expected a PDF but got HTML, it's likely a landing page
+            if "html" in content_type:
+                logger.info("received_html_instead_of_pdf_using_fallback", url=url)
+                return await self._parser.extract(resp.text, "text/html")
+                
             return await self._parser.extract_pdf_from_bytes(resp.content)
         except Exception as exc:
             logger.warning("source_pdf_extraction_failed", url=url, error=str(exc))

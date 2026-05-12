@@ -133,19 +133,30 @@ class GazetteSource(WebScrapeSource):
 
                         title = f"[{category}] {ministry}: {subject}"[:400]
                         
-                        # Extract PDF URL from ID
-                        match = re.search(r'-(\d{4})-(\d+)$', gazette_id)
-                        if not match:
-                            match = re.search(r'-(\d+)$', gazette_id)
-                            doc_num = match.group(1) if match else None
+                        # Extract PDF URL from ID using robust pattern matching
+                        year, doc_num = None, None
+                        
+                        # Try long format first: ...-YYYY-NNNNN
+                        long_match = re.search(r'-(\d{4})-(\d+)$', gazette_id)
+                        if long_match:
+                            year, doc_num = long_match.groups()
                         else:
-                            year = match.group(1)
-                            doc_num = match.group(2)
+                            # Fallback to short format: ...-NNNNN
+                            short_match = re.search(r'-(\d+)$', gazette_id)
+                            if short_match:
+                                doc_num = short_match.group(1)
+                                year = str(publish_at.year) if publish_at else None
 
-                        if not doc_num: continue
+                        if not (year and doc_num):
+                            logger.warning("egazette_invalid_id_format", gazette_id=gazette_id)
+                            continue
+                            
                         pdf_url = f"{EGAZETTE_BASE}/WriteReadData/{year}/{doc_num}.pdf"
                         
                         content = await self._fetch_pdf_content_custom_client(client, pdf_url, title=title)
+                        
+                        if content == "DUPLICATE_SKIPPED":
+                            continue
                         
                         doc = self.create_raw_document(
                             title=title,

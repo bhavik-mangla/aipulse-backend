@@ -92,14 +92,25 @@ class IBBISource(WebScrapeSource):
                 pdf_url = urljoin(str(self._config.url), href)
 
                 logger.debug("ibbi_fetching_pdf", url=pdf_url)
-                content = await self._fetch_pdf_content(pdf_url)
+                content = await self._fetch_pdf_content(pdf_url, title=title)
                 
-                content_type = "text/plain" if content else "text/html"
+                if content == "DUPLICATE_SKIPPED":
+                    continue
+
+                # Determine content type based on URL and successful fetch
+                if ".pdf" in pdf_url.lower():
+                    content_type = "application/pdf"
+                else:
+                    content_type = "text/html"
+                
+                if not content:
+                    content = title
+                    content_type = "text/plain"
 
                 doc = self.create_raw_document(
                     title=title,
                     fetch_url=pdf_url,
-                    raw_content=content or title, # Fallback to title if PDF extraction fails
+                    raw_content=content,
                     content_type=content_type,
                     metadata={
                         "portal_url": str(self._config.url),
