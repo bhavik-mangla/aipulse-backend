@@ -135,7 +135,8 @@ class MCASource(WebScrapeSource):
                         logger.warning("mca_unexpected_response", category=category)
                         continue
                     
-                    items = data["data"]
+                    # Limit to latest items only (first 20 per category is plenty)
+                    items = data["data"][:20]
                     if not isinstance(items, list):
                         continue
 
@@ -153,20 +154,23 @@ class MCASource(WebScrapeSource):
                             logger.debug("mca_skip_old_item", title=title[:50], date=date_str)
                             continue
 
-                        # Base64 encode the link ID
+                        # Use a STABLE URL for deduplication and document tracking
+                        # The dynamic dms/getdocument URL changes because of base64/session
+                        stable_url = f"{str(self._config.url)}?docId={doc_id}"
+                        
+                        # Base64 encode the link ID for the ACTUAL fetch
                         encoded_id = base64.b64encode(str(doc_id).encode()).decode()
-                        pdf_url = f"{MCA_DOCUMENT_API}?doc={encoded_id}&docCategory={category}&type=open"
+                        pdf_fetch_url = f"{MCA_DOCUMENT_API}?doc={encoded_id}&docCategory={category}&type=open"
                         
-                        logger.debug("mca_extracting_pdf_via_browser", doc_id=doc_id)
-                        
-                        # Pre-check for duplicate title/source via shared helper logic
-                        partial_doc = self.create_raw_document(title=clean_text(title), fetch_url=pdf_url, raw_content=title)
+                        # Pre-check for duplicate via stable URL
+                        partial_doc = self.create_raw_document(title=clean_text(title), fetch_url=stable_url, raw_content=title)
                         is_dup, _ = await self.check_duplicate(partial_doc)
                         if is_dup:
                             logger.info("mca_skip_duplicate_pre_fetch", title=title[:50])
-                            # Do not yield duplicate to pipeline to avoid re-processing
                             continue
 
+                        logger.debug("mca_extracting_pdf_via_browser", doc_id=doc_id)
+                        
                         # Fetch PDF bytes inside browser context to bypass 403
                         try:
                             pdf_base64 = await page.evaluate("""
@@ -185,7 +189,7 @@ class MCASource(WebScrapeSource):
                                         return null;
                                     }
                                 }
-                            """, pdf_url)
+                            """, pdf_fetch_url)
                             
                             content = ""
                             if pdf_base64:
@@ -197,12 +201,13 @@ class MCASource(WebScrapeSource):
                         
                         doc = self.create_raw_document(
                             title=clean_text(title),
-                            fetch_url=pdf_url,
+                            fetch_url=stable_url,
                             raw_content=content or title,
                             content_type="application/pdf" if content else "text/html",
                             metadata={
                                 "doc_id": doc_id,
                                 "category": category,
+                                "pdf_fetch_url": pdf_fetch_url,
                                 "description": item.get("shortDescription", ""),
                                 "portal_url": str(self._config.url)
                             }
@@ -212,7 +217,7 @@ class MCASource(WebScrapeSource):
                             yield doc
                             yielded += 1
                         
-                        if yielded >= 30:
+                        if yielded >= 25:
                             break
                     
                     if yielded >= 30:
