@@ -311,7 +311,9 @@ def render_email_html(
 </head>
 <body>
     <div class="header">
-        <h1>{escape(t['digest_header'])}</h1>
+        <a href="https://govnotify.vercel.app" style="color: white; text-decoration: none;">
+            <h1 style="margin:0;">{escape(t['digest_header'])}</h1>
+        </a>
         <div class="date">{escape(date_display)} &bull; {digest.total_items} {update_word}</div>
     </div>
     <div style="padding: 0 10px;">
@@ -322,9 +324,9 @@ def render_email_html(
         <p>{escape(t['unsubscribe_msg'])}</p>
         <p><strong>GovNotify HQ</strong><br>{escape(t['hq_address'])}</p>
         <p>
-            <a href="https://govnotify.in" style="color:#2d5aae; font-weight: bold; text-decoration: none;">Visit GovNotify</a> &bull;
-            <a href="https://govnotify.in/settings" style="color:#2d5aae; text-decoration: none;">{escape(t['manage_prefs'])}</a> &bull; 
-            <a href="https://govnotify.in/unsubscribe" style="color:#2d5aae; text-decoration: none;">{escape(t['unsubscribe'])}</a>
+            <a href="https://govnotify.vercel.app" style="color:#2d5aae; font-weight: bold; text-decoration: none;">Visit GovNotify</a> &bull;
+            <a href="https://govnotify.vercel.app/settings" style="color:#2d5aae; text-decoration: none;">{escape(t['manage_prefs'])}</a> &bull; 
+            <a href="https://govnotify.vercel.app/unsubscribe" style="color:#2d5aae; text-decoration: none;">{escape(t['unsubscribe'])}</a>
         </p>
     </div>
 </body>
@@ -419,10 +421,10 @@ def _format_date(date_str: str, language: str = "en") -> str:
 
 
 def _text_to_html(text: str) -> str:
-    """Convert plain text with markdown-like formatting to simple HTML."""
+    """Convert plain text with markdown-like formatting to clean HTML."""
     html = escape(text)
     
-    # Headers: ### Title -> <h3 style="margin: 16px 0 8px 0; color: #1a365d; font-size: 16px;">Title</h3>
+    # Headers: ### Title
     html = re.sub(
         r"^###\s*(.+?)$", 
         r'<h3 style="margin: 16px 0 8px 0; color: #1a365d; font-size: 16px;">\1</h3>', 
@@ -430,16 +432,31 @@ def _text_to_html(text: str) -> str:
         flags=re.MULTILINE
     )
     
-    # Bold: **text** -> <strong>text</strong>
+    # Bold: **text**
     html = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", html)
     
-    # Bullet points: Lines starting with • or -
-    html = re.sub(r"^[•\-]\s*", "• ", html, flags=re.MULTILINE)
+    # Convert bullet points into a clean <ul> list
+    # 1. Identify blocks of bullet points
+    lines = html.splitlines()
+    in_list = False
+    new_lines = []
     
-    # Paragraphs: double newlines -> </p><p>
-    html = html.replace("\n\n", "</p><p>")
-    
-    # Single newlines -> <br>
-    html = html.replace("\n", "<br>\n")
-    
-    return f"<p>{html}</p>"
+    for line in lines:
+        line = line.strip()
+        if line.startswith('•') or line.startswith('-'):
+            if not in_list:
+                new_lines.append('<ul style="margin: 8px 0; padding-left: 20px; color: #334155;">')
+                in_list = True
+            content = line[1:].strip()
+            new_lines.append(f'<li style="margin-bottom: 6px;">{content}</li>')
+        else:
+            if in_list:
+                new_lines.append('</ul>')
+                in_list = False
+            if line:
+                new_lines.append(f'<p style="margin: 8px 0;">{line}</p>')
+                
+    if in_list:
+        new_lines.append('</ul>')
+        
+    return "\n".join(new_lines)

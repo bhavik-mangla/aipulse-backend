@@ -79,7 +79,7 @@ class EmailChannel(AbstractDeliveryChannel):
             message.add_content(Content(MimeType.text, plain_content))
 
             # One-click unsubscribe header and personalized link
-            unsubscribe_url = f"https://govnotify.in/api/v1/users/unsubscribe?email={user.email}"
+            unsubscribe_url = f"https://govnotify.vercel.app/unsubscribe?email={user.email}"
             message.add_header(Header("List-Unsubscribe", f"<{unsubscribe_url}>"))
 
             response = sg.send(message)
