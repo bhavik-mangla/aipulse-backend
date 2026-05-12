@@ -94,7 +94,7 @@ class IncomeTaxSource(WebScrapeSource):
                     
                     # 2. Content Fallback (extracting text from description if no PDF)
                     content = title
-                    content_type = "text/plain"
+                    content_type = "text/html"
                     
                     if pdf_url:
                         # Pass title to leverage early deduplication check in base.py

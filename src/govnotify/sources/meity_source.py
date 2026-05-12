@@ -83,14 +83,20 @@ class MeitYSource(WebScrapeSource):
                 logger.info("meity_page_success", page=page, count=len(entries))
                 
                 for entry in entries:
+                    title = entry['title']
+                    url = entry['url']
 
-                    content = await self._fetch_pdf_content(entry['url'])
+                    # Pass title to leverage early deduplication check in base.py
+                    content = await self._fetch_pdf_content(url, title=title)
+                    
+                    if content == "DUPLICATE_SKIPPED":
+                        continue
                     
                     doc = self.create_raw_document(
-                        title=entry['title'],
-                        fetch_url=entry['url'],
+                        title=title,
+                        fetch_url=url,
                         raw_content=content,
-                        content_type="application/pdf",
+                        content_type="application/pdf" if content else "text/plain",
                         metadata={"portal_url": str(self._config.url)}
                     )
 

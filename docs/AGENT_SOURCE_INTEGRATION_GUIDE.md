@@ -90,3 +90,30 @@ We replaced hundreds of lines of brittle regex and HTML parsing with a concise, 
 3. **Use the built-in deduplication.** Once you have deterministic metadata, pass the `title` and `url` to the base class methods. Rely on `content_hash` and `is_duplicate_callback` to save bandwidth and OCR costs.
 4. **Assume Anti-Bot.** Start with high-quality headers immediately. If blocked, fallback to Playwright JS evaluation.
 5. **Verify Edge Cases.** Always test the final logic against a known complex item (e.g., an item with a weird title or an old item with no PDF attached) to ensure fallbacks (like reading `documentContent` HTML) work.
+
+---
+
+## 6. Best Practices for Adding a New Source
+
+Follow these steps to ensure a high-quality, maintainable integration:
+
+### 1. Research the Data Source
+*   **Check for APIs first**: Use browser DevTools (Network tab) to see if the site loads data via JSON/XHR.
+*   **Check for RSS/Atom**: Many government sites have hidden or legacy RSS feeds which are the most reliable.
+*   **Identify dynamic content**: If the site requires JavaScript execution (React, Angular, Vue), use `crawl4ai` or `playwright`.
+
+### 2. Implementation Standards
+*   **Inherit from `WebScrapeSource`**: Always extend the base class to get rate-limiting and standard headers for free.
+*   **Use `self._get()`**: Never use bare `httpx` or `requests`. Use the rate-limited helper.
+*   **Deterministic URL Mapping**: As discovered in the Income Tax portal case, look for IDs or metadata that provide direct document links rather than parsing titles.
+*   **Robust Date Parsing**: Use `govnotify.sources.utils.parse_indian_date` for consistent handling of various formats (DD-MM-YYYY, DD-MMM-YYYY, etc.).
+
+### 3. Optimization & Deduplication
+*   **Title-based Pre-fetch Check**: Always pass the `title` and `url` to `_fetch_pdf_content` or `_fetch_html_content`. This prevents unnecessary downloads/OCR of existing documents.
+*   **Date Filtering**: If the source provides a date, compare it against the `since` parameter and skip items older than the threshold.
+*   **Graceful Fallbacks**: If PDF extraction fails, fallback to HTML extraction or the document description so the user at least gets a summary.
+
+### 4. Testing & Validation
+*   **Edge Case Verification**: Test with documents that have special characters in titles, no PDF attachments, or very large file sizes.
+*   **Anti-Bot Verification**: Ensure the source works in the production Docker environment, where network paths might differ from local dev.
+*   **Memory Efficiency**: Don't load massive amounts of data into memory at once. Use generators (`yield`) where possible.

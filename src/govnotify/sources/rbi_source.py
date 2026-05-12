@@ -44,7 +44,6 @@ class BaseRBISource(WebScrapeSource):
         yielded = 0
         
         for entry in entries:
-
             title = entry.get("title", "RBI Notification")
             pdf_url = entry.get("pdf_url")
             
@@ -52,6 +51,8 @@ class BaseRBISource(WebScrapeSource):
             is_pdf = False
             if pdf_url:
                 content = await self._fetch_pdf_content(pdf_url, title=title)
+                if content == "DUPLICATE_SKIPPED":
+                    continue
                 if content:
                     is_pdf = True
             
@@ -59,12 +60,14 @@ class BaseRBISource(WebScrapeSource):
                 detail_url = entry.get("url")
                 if detail_url:
                     content = await self._fetch_html_content(detail_url, title=title)
+                    if content == "DUPLICATE_SKIPPED":
+                        continue
 
             doc = self.create_raw_document(
                 title=title,
                 fetch_url=entry.get("url") or str(self._config.url),
-                raw_content=content,
-                content_type="text/plain" if is_pdf else "text/html",
+                raw_content=content or title,
+                content_type="application/pdf" if is_pdf else "text/html",
                 metadata={
                     "pdf_url": pdf_url,
                     "portal_url": entry.get("url")

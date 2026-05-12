@@ -70,13 +70,23 @@ class PIBSource(WebScrapeSource):
         for result in results:
             title = result.metadata.get("title", "Untitled")
             
-            content, pdf_url, is_plain = await self._fetch_page_content_and_pdf(result.url)
+            # Efficient pre-fetch check
+            partial_doc = self.create_raw_document(title=title, fetch_url=result.url, raw_content=title)
+            is_dup, _ = await self.check_duplicate(partial_doc)
+            if is_dup:
+                logger.info("pib_skip_duplicate_pre_fetch", title=title[:50])
+                continue
+
+            content, pdf_url = await self._fetch_pib_page(result.url)
+            
+            if not content:
+                content = title
 
             doc = self.create_raw_document(
                 title=title,
                 fetch_url=result.url,
                 raw_content=content,
-                content_type="text/plain" if is_plain else "text/html",
+                content_type="text/html",
                 metadata={
                     "tags": result.metadata.get("tags", []),
                     "author": result.metadata.get("author", ""),
@@ -93,8 +103,8 @@ class PIBSource(WebScrapeSource):
 
         logger.info("pib_fetch_complete", yielded=yielded)
 
-    async def _fetch_page_content_and_pdf(self, url: str) -> tuple[str, str | None, bool]:
-        """Fetch the full content of a press release and look for a PDF link."""
+    async def _fetch_pib_page(self, url: str) -> tuple[str, str | None]:
+        """Fetch PIB page, extract clean text from hidden input or div, and find PDF link."""
         try:
             resp = await self._get(url)
             html = resp.text
@@ -106,27 +116,25 @@ class PIBSource(WebScrapeSource):
             if pdf_link:
                 pdf_url = urljoin(url, pdf_link.get('href'))
             
-            # 2. Extract content
-            # Look for hidden input first (common in PIB)
+            # 2. Extract content (PIB special cleaning)
+            # Look for hidden input first (contains the pure press release text)
             hidden_input = soup.find('input', {'id': 'ltrDescriptionn'})
             if hidden_input:
                 raw_val = hidden_input.get('value', '')
-                # Clean the hidden input value if it contains HTML
                 if "<" in raw_val:
-                    return await self._parser.extract(raw_val, "text/html"), pdf_url, True
-                return raw_val, pdf_url, True
+                    return await self._parser.extract(raw_val, "text/html"), pdf_url
+                return raw_val, pdf_url
             
             # Fallback to ReleaseText div
             release_div = soup.find('div', class_='ReleaseText')
             if release_div:
-                # Always extract clean text from the div
-                return await self._parser.extract(str(release_div), "text/html"), pdf_url, True
+                return await self._parser.extract(str(release_div), "text/html"), pdf_url
                 
-            # Use parser for clean HTML text if no specific div found
-            return await self._parser.extract(html, "text/html"), pdf_url, True
+            # Final fallback
+            return await self._parser.extract(html, "text/html"), pdf_url
         except Exception as exc:
             logger.warning("pib_page_fetch_failed", url=url, error=str(exc))
-            return "", None, False
+            return "", None
 
     def _parse_rss_date(self, date_str: str) -> datetime | None:
         """Parse RSS date strings safely."""

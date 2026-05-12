@@ -147,24 +147,28 @@ class MCASource(WebScrapeSource):
                         if not doc_id or not title:
                             continue
 
+                        # Date-based filtering
+                        item_date = parse_indian_date(date_str)
+                        if since and item_date and item_date < since:
+                            logger.debug("mca_skip_old_item", title=title[:50], date=date_str)
+                            continue
+
                         # Base64 encode the link ID
                         encoded_id = base64.b64encode(str(doc_id).encode()).decode()
                         pdf_url = f"{MCA_DOCUMENT_API}?doc={encoded_id}&docCategory={category}&type=open"
                         
                         logger.debug("mca_extracting_pdf_via_browser", doc_id=doc_id)
                         
+                        # Pre-check for duplicate title/source via shared helper logic
+                        partial_doc = self.create_raw_document(title=clean_text(title), fetch_url=pdf_url, raw_content=title)
+                        is_dup, _ = await self.check_duplicate(partial_doc)
+                        if is_dup:
+                            logger.info("mca_skip_duplicate_pre_fetch", title=title[:50])
+                            # Do not yield duplicate to pipeline to avoid re-processing
+                            continue
+
                         # Fetch PDF bytes inside browser context to bypass 403
                         try:
-                            # Pre-check for duplicate title/source via shared helper logic
-                            # We simulate it here since we fetch via Playwright
-                            partial_doc = self.create_raw_document(title=clean_text(title), fetch_url=pdf_url, raw_content=title)
-                            is_dup, _ = await self.check_duplicate(partial_doc)
-                            if is_dup:
-                                logger.info("mca_skip_duplicate_pre_fetch", title=title[:50])
-                                yield partial_doc
-                                yielded += 1
-                                continue
-
                             pdf_base64 = await page.evaluate("""
                                 async (url) => {
                                     try {

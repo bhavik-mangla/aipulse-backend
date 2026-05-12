@@ -103,13 +103,16 @@ class SEBISource(WebScrapeSource):
                 logger.debug("sebi_fetching_detail", url=detail_url)
                 content, pdf_url = await self._fetch_detail_and_pdf(detail_url, title=title)
                 
+                if content == "DUPLICATE_SKIPPED":
+                    continue
+
                 # If we got PDF content, it is plain text. Set content_type accordingly.
-                content_type = "text/plain" if pdf_url and content else "text/html"
+                content_type = "application/pdf" if pdf_url and content else "text/html"
 
                 doc = self.create_raw_document(
                     title=title,
                     fetch_url=detail_url,
-                    raw_content=content,
+                    raw_content=content or title,
                     content_type=content_type,
                     metadata={
                         "doc_type": doc_type,

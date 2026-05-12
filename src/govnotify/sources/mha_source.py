@@ -50,28 +50,33 @@ class MHASource(WebScrapeSource):
         try:
             resp = await self._get(str(self._config.url))
             html = resp.text
-        except Exception:
+        except Exception as exc:
+            logger.error("mha_listing_fetch_failed", error=str(exc))
             return
 
         entries = self._parse_listing(html, str(self._config.url))
-        limit = self._config.crawler_config.get("limit", 15)
+        limit = self._config.crawler_config.get("limit", 25)
         yielded = 0
         seen_urls = set()
         
         for entry in entries:
             url = entry['url']
+            title = entry['title']
             if url in seen_urls:
                 continue
             seen_urls.add(url)
 
-
-            content = await self._fetch_pdf_content(url)
+            # Pass title to leverage early deduplication check in base.py
+            content = await self._fetch_pdf_content(url, title=title)
             
+            if content == "DUPLICATE_SKIPPED":
+                continue
+
             doc = self.create_raw_document(
-                title=entry['title'],
+                title=title,
                 fetch_url=url,
                 raw_content=content,
-                content_type="application/pdf",
+                content_type="application/pdf" if content else "text/plain",
                 metadata={"portal_url": str(self._config.url)}
             )
 
@@ -81,7 +86,7 @@ class MHASource(WebScrapeSource):
                 if yielded >= limit:
                     break
 
-        logger.info("mha_complete", yielded=yielded)
+        logger.info("mha_fetch_complete", yielded=yielded)
 
     def _parse_listing(self, html: str, current_url: str) -> list[dict]:
         """Parse MHA table rows for titles and PDF links."""

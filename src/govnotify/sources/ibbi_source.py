@@ -98,19 +98,16 @@ class IBBISource(WebScrapeSource):
                     continue
 
                 # Determine content type based on URL and successful fetch
-                if ".pdf" in pdf_url.lower():
-                    content_type = "application/pdf"
-                else:
-                    content_type = "text/html"
+                content_type = "application/pdf" if ".pdf" in pdf_url.lower() else "text/html"
                 
                 if not content:
                     content = title
-                    content_type = "text/plain"
+                    content_type = "text/html"
 
                 doc = self.create_raw_document(
                     title=title,
                     fetch_url=pdf_url,
-                    raw_content=content,
+                    raw_content=content or title,
                     content_type=content_type,
                     metadata={
                         "portal_url": str(self._config.url),

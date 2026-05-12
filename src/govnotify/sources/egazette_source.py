@@ -133,19 +133,25 @@ class GazetteSource(WebScrapeSource):
 
                         title = f"[{category}] {ministry}: {subject}"[:400]
                         
-                        # Extract PDF URL from ID using robust pattern matching
+                        # Robust extraction of year and document number
                         year, doc_num = None, None
                         
-                        # Try long format first: ...-YYYY-NNNNN
-                        long_match = re.search(r'-(\d{4})-(\d+)$', gazette_id)
-                        if long_match:
-                            year, doc_num = long_match.groups()
+                        # 1. Try format with 8-digit date: ...-DDMMYYYY-NNNNN
+                        date_match = re.search(r'-(\d{2})(\d{2})(\d{4})-(\d+)$', gazette_id)
+                        if date_match:
+                            year = date_match.group(3)
+                            doc_num = date_match.group(4)
                         else:
-                            # Fallback to short format: ...-NNNNN
-                            short_match = re.search(r'-(\d+)$', gazette_id)
-                            if short_match:
-                                doc_num = short_match.group(1)
-                                year = str(publish_at.year) if publish_at else None
+                            # 2. Try old long format: ...-YYYY-NNNNN
+                            long_match = re.search(r'-(\d{4})-(\d+)$', gazette_id)
+                            if long_match:
+                                year, doc_num = long_match.groups()
+                            else:
+                                # 3. Fallback to short format: ...-NNNNN
+                                short_match = re.search(r'-(\d+)$', gazette_id)
+                                if short_match:
+                                    doc_num = short_match.group(1)
+                                    year = str(publish_at.year) if publish_at else None
 
                         if not (year and doc_num):
                             logger.warning("egazette_invalid_id_format", gazette_id=gazette_id)
@@ -161,8 +167,8 @@ class GazetteSource(WebScrapeSource):
                         doc = self.create_raw_document(
                             title=title,
                             fetch_url=pdf_url,
-                            raw_content=content,
-                            content_type="application/pdf",
+                            raw_content=content or title,
+                            content_type="application/pdf" if content else "text/html",
                             metadata={
                                 "gazette_id": gazette_id,
                                 "ministry": ministry,
