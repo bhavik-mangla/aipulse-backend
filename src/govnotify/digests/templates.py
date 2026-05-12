@@ -322,8 +322,9 @@ def render_email_html(
         <p>{escape(t['unsubscribe_msg'])}</p>
         <p><strong>GovNotify HQ</strong><br>{escape(t['hq_address'])}</p>
         <p>
-            <a href="https://govnotify.in/settings" style="color:#2d5aae;">{escape(t['manage_prefs'])}</a> &bull; 
-            <a href="https://govnotify.in/unsubscribe" style="color:#2d5aae;">{escape(t['unsubscribe'])}</a>
+            <a href="https://govnotify.in" style="color:#2d5aae; font-weight: bold; text-decoration: none;">Visit GovNotify</a> &bull;
+            <a href="https://govnotify.in/settings" style="color:#2d5aae; text-decoration: none;">{escape(t['manage_prefs'])}</a> &bull; 
+            <a href="https://govnotify.in/unsubscribe" style="color:#2d5aae; text-decoration: none;">{escape(t['unsubscribe'])}</a>
         </p>
     </div>
 </body>
@@ -348,18 +349,10 @@ def _render_source_html(
     if summary:
         summary_html = f'<div class="summary-block">{_text_to_html(summary)}</div>'
 
-    items_html = ""
-    for item in section.items:
-        items_html += f"""
-        <div class="item-link-box">
-            <a href="{escape(str(item.source_url))}" class="item-link">&rarr; {escape(item.title)}</a>
-        </div>"""
-
     return (
         f'<div class="section">'
         f'<h2 class="section-header">{escape(section.source_name)}</h2>'
         f'{summary_html}'
-        f'<div style="margin-top: 12px;">{items_html}</div>'
         f'</div>'
     )
 
@@ -380,7 +373,6 @@ def _render_category_html(
             f'</div>'
         )
 
-    # Clean list of 1-liners
     summary = (
         section.summary_hindi
         if language == "hi" and section.summary_hindi
@@ -391,22 +383,11 @@ def _render_category_html(
     if summary:
         summary_html = f'<div class="summary-block" style="margin-bottom:0;">{_text_to_html(summary)}</div>'
 
-    # Minimal source links
-    items_html = ""
-    for item in section.items:
-        items_html += f"""
-        <div style="margin-top: 4px; font-size: 11px;">
-            <a href="{escape(str(item.source_url))}" style="color: #94a3b8; text-decoration: none;">&rarr; {escape(item.source_name)}: {escape(item.title)}</a>
-        </div>"""
-
     return (
         f'<div class="category-section">'
         f'<h2 class="category-header">'
         f'<span class="category-emoji">{emoji}</span>{escape(cat_name)}</h2>'
         f'{summary_html}'
-        f'<div style="margin-top: 12px;">'
-        f'{items_html}'
-        f'</div>'
         f'</div>'
     )
 

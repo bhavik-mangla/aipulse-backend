@@ -93,6 +93,11 @@ We replaced hundreds of lines of brittle regex and HTML parsing with a concise, 
 
 ---
 
+### 5. Maintenance & Digest Quality
+*   **Keep Digests Clean**: Do not include redundant links or source lists in the email body. The LLM summary should be sufficient.
+*   **Omit, Don't Trim**: If a category doesn't fit in a user's `max_items` limit, omit it entirely rather than showing a "Trimmed" message. This keeps the email light and reduces spam triggers.
+*   **Footer Links**: Always include a direct link back to the main portal (GovNotify) in the footer for engagement.
+
 ## 6. Best Practices for Adding a New Source
 
 Follow these steps to ensure a high-quality, maintainable integration:

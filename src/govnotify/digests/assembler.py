@@ -206,28 +206,14 @@ class UserDigestAssembler:
         """
         Trim category sections to fit within max_items total.
         Keeps items from earlier (higher-priority) categories first.
+        Completely omits sections that don't fit.
         """
         trimmed: list[CategoryDigest] = []
         remaining = max_items
 
         for section in sections:
             if remaining <= 0:
-                # Include section header with no items
-                trimmed.append(
-                    CategoryDigest(
-                        id=section.id,
-                        category=section.category,
-                        date=section.date,
-                        items=[],
-                        summary_text=section.summary_text,
-                        summary_hindi=section.summary_hindi,
-                        item_count=0,
-                        has_updates=False,
-                        no_update_message="Trimmed to fit digest size limit.",
-                        generated_at=section.generated_at,
-                    )
-                )
-                continue
+                break
 
             if section.item_count <= remaining:
                 trimmed.append(section)
