@@ -1,258 +1,169 @@
 """
 Income Tax notifications source.
-Scrapes the Income Tax India website and extracts content from PDFs.
+Scrapes the Income Tax India website using Liferay's Headless API for 100% deterministic mapping.
 
-Uses a hybrid strategy:
-1. Wait for React cards to render with robust retries.
-2. Extract title, date, and document URL from card structure.
-3. Fallback to slug generation for missing links (confirmed by user observation).
+Strategy:
+1. Use Headless Structured Contents API to fetch items from multiple categories.
+2. Categories: Notification (37788), Circulars (37776), Press Release (37794), Others (37791).
+3. Extract definitive PDF URLs directly from JSON metadata (reportFile or documentContent).
 """
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
+import asyncio
+from datetime import datetime
 from typing import AsyncIterator
-from urllib.parse import urljoin
 
 import structlog
-from bs4 import BeautifulSoup
 
 from govnotify.models.source import RawDocument, SourceConfig, SourceType
 from govnotify.sources.registry import SourceRegistry
 from govnotify.sources.base import WebScrapeSource
-from govnotify.sources.utils import parse_indian_date
 
 logger = structlog.get_logger(__name__)
 
-INCOME_TAX_NOTIFICATIONS_URL = "https://www.incometaxindia.gov.in/notifications"
-INCOME_TAX_CIRCULARS_URL = "https://www.incometaxindia.gov.in/circulars"
+INCOME_TAX_BASE_URL = "https://www.incometaxindia.gov.in"
+SITE_ID = "20117"
 
+# Proven Category IDs
+CATEGORIES = {
+    "37788": "Notification",
+    "37776": "Circular",
+    "37794": "Press Release",
+    "37791": "Others",
+    "6386665": "Miscellaneous Communication"
+}
 
 @SourceRegistry.register
 class IncomeTaxSource(WebScrapeSource):
-    """Income Tax scraper with PDF support targeting Liferay structures."""
+    """Deterministic Income Tax scraper using Liferay Headless API."""
 
     def __init__(self) -> None:
         super().__init__(SourceConfig(
             id="income_tax",
             name="Income Tax Notifications & Circulars",
-            url=INCOME_TAX_NOTIFICATIONS_URL,
+            url=f"{INCOME_TAX_BASE_URL}/notifications",
             source_type=SourceType.WEB_SCRAPE,
             schedule_cron="0 */12 * * *",
             region_tags=["national"],
             language="en",
-            crawler_class="govnotify.crawlers.crawl4ai_crawler.Crawl4AICrawler",
-            rate_limit_rpm=15,
-            crawler_config={"limit": 25}
+            crawler_class="govnotify.crawlers.base.BaseCrawler", # Using base as we use direct API
+            rate_limit_rpm=20,
+            crawler_config={"limit": 50}
         ))
 
     async def fetch(
         self, since: datetime | None = None
     ) -> AsyncIterator[RawDocument]:
-        """Fetch notifications and circulars."""
-        logger.info("income_tax_fetch_start", since=str(since) if since else "latest")
+        """Fetch latest items across all relevant categories via Headless API."""
+        logger.info("income_tax_api_fetch_start", since=str(since) if since else "latest")
         
-        target_urls = [INCOME_TAX_NOTIFICATIONS_URL, INCOME_TAX_CIRCULARS_URL]
-        
-        all_entries = []
-        for url in target_urls:
-            try:
-                entries = await self._crawl_with_robust_rendering(url)
-                if entries:
-                    logger.info("income_tax_success", url=url, count=len(entries))
-                    all_entries.extend(entries)
-                else:
-                    logger.warning("income_tax_no_entries", url=url)
-            except Exception as exc:
-                logger.warning("income_tax_exception", url=url, error=str(exc))
+        # High-quality headers to avoid 403/503
+        api_headers = {
+            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:124.0) Gecko/20100101 Firefox/124.0",
+            "Accept": "application/json",
+            "Referer": f"{INCOME_TAX_BASE_URL}/notifications"
+        }
 
         yielded = 0
-        seen_urls = set()
-        unique_entries = []
-        for e in all_entries:
-            url_val = e.get('url')
-            if not url_val: continue
-            
-            # Handle list of URL variations for hashing
-            hash_key = tuple(url_val) if isinstance(url_val, list) else url_val
-            
-            if hash_key not in seen_urls:
-                seen_urls.add(hash_key)
-                unique_entries.append(e)
+        limit = self._config.crawler_config.get("limit", 50)
+        seen_hashes = set()
 
-        # Limit for performance
-        limit = self._config.crawler_config.get("limit", 25)
-        
-        for entry in unique_entries:
-
-            # Resolve the URL if it's a list of variations
-            pdf_url = entry.get("url")
-            if isinstance(pdf_url, list):
-                pdf_url = await self._resolve_working_url(pdf_url)
+        # Iterate through proven categories
+        for cat_id, cat_name in CATEGORIES.items():
+            logger.info("income_tax_fetching_category", category=cat_name, id=cat_id)
             
-            if not pdf_url:
-                logger.warning("income_tax_no_working_url", title=entry['title'])
+            api_url = f"{INCOME_TAX_BASE_URL}/o/headless-delivery/v1.0/sites/{SITE_ID}/structured-contents"
+            params = {
+                "flatten": "true",
+                "pageSize": 20,
+                "sort": "dateModified:desc",
+                "filter": f"taxonomyCategoryIds/any(t:t eq {cat_id})"
+            }
+
+            try:
+                resp = await self._get(api_url, params=params, headers=api_headers)
+                items = resp.json().get('items', [])
+                
+                for item in items:
+                    title = item.get('title', '').strip()
+                    if not title: continue
+
+                    # 1. Deterministic PDF URL Extraction from Metadata
+                    pdf_url = self._extract_pdf_from_meta(item)
+                    
+                    # 2. Content Fallback (extracting text from description if no PDF)
+                    content = title
+                    content_type = "text/plain"
+                    
+                    if pdf_url:
+                        # Pass title to leverage early deduplication check in base.py
+                        extracted_pdf = await self._fetch_pdf_content(pdf_url, title=title)
+                        if extracted_pdf == "DUPLICATE_SKIPPED":
+                            continue
+                        if extracted_pdf:
+                            content = extracted_pdf
+                            content_type = "application/pdf"
+                    else:
+                        # Fallback: Use HTML/Plain text content from fields if PDF is missing
+                        desc = self._get_field_value(item, "description") or self._get_field_value(item, "shortDescription")
+                        if desc:
+                            content = desc
+                            content_type = "text/html"
+
+                    doc = self.create_raw_document(
+                        title=title,
+                        fetch_url=pdf_url or item.get('itemURL'),
+                        raw_content=content,
+                        content_type=content_type,
+                        metadata={
+                            "category": cat_name,
+                            "portal_url": str(self._config.url),
+                            "article_id": item.get('id'),
+                            "date_modified": item.get('dateModified')
+                        },
+                    )
+
+                    if doc.content_hash not in seen_hashes and await self.validate_response(doc):
+                        seen_hashes.add(doc.content_hash)
+                        yield doc
+                        yielded += 1
+                        if yielded >= limit:
+                            return
+
+            except Exception as exc:
+                logger.error("income_tax_category_failed", category=cat_name, error=str(exc))
                 continue
 
-            content = await self._fetch_pdf_content(pdf_url)
-            
-            doc = self.create_raw_document(
-                title=entry['title'],
-                fetch_url=pdf_url,
-                raw_content=content,
-                content_type="application/pdf",
-                metadata={
-                    "notification_number": entry.get("notification_number", ""),
-                    "portal_url": entry.get("portal_url") or str(self._config.url),
-                    "pdf_url": pdf_url,
-                },
-            )
+        logger.info("income_tax_complete", total_yielded=yielded)
 
-            if await self.validate_response(doc):
-                yield doc
-                yielded += 1
-                if yielded >= limit:
-                    break
+    def _extract_pdf_from_meta(self, item: dict) -> str | None:
+        """Recursively find the definitive PDF URL in Liferay metadata."""
+        fields = item.get('contentFields', [])
+        
+        # Priority 1: reportFile field (direct document library link)
+        for f in fields:
+            if f['name'] == 'reportFile' and f['contentFieldValue'].get('document'):
+                return f"{INCOME_TAX_BASE_URL}{f['contentFieldValue']['document']['contentUrl']}"
 
-        logger.info("income_tax_complete", yielded=yielded)
+        # Priority 2: documentContent or description (regex search)
+        for f in fields:
+            if f['name'] in ['documentContent', 'description', 'shortDescription']:
+                data = str(f['contentFieldValue'].get('data', ''))
+                match = re.search(r'/documents/[^\s"\'<>]+', data)
+                if match:
+                    return f"{INCOME_TAX_BASE_URL}{match.group(0)}"
 
-    async def _resolve_working_url(self, urls: list[str]) -> str | None:
-        """Try multiple URL variations and return the first one that works."""
-        import httpx
-        async with httpx.AsyncClient(follow_redirects=True, timeout=10.0) as client:
-            for url in urls:
-                try:
-                    resp = await client.head(url)
-                    if resp.status_code == 200:
-                        return url
-                except Exception:
-                    continue
+        # Priority 3: externalPortalLink
+        for f in fields:
+            if f['name'] == 'externalPortalLink' and f['contentFieldValue'].get('data'):
+                return f['contentFieldValue']['data']
+
         return None
 
-    async def _crawl_with_robust_rendering(self, url: str) -> list[dict]:
-        """Use Crawl4AI/Playwright with multiple wait strategies, with httpx fallback."""
-        from crawl4ai import AsyncWebCrawler, CrawlerRunConfig, CacheMode
-        
-        try:
-            async with AsyncWebCrawler() as crawler:
-                # We wait for the body but use JS to wait specifically for the list content
-                config = CrawlerRunConfig(
-                    wait_for="css:body", 
-                    cache_mode=CacheMode.BYPASS,
-                    page_timeout=90000,
-                )
-                
-                js_code = """
-                const delay = ms => new Promise(res => setTimeout(res, ms));
-                // Wait up to 15 seconds for the cards to appear
-                for (let i = 0; i < 30; i++) {
-                    if (document.querySelector('.notification-card-width')) break;
-                    await delay(500);
-                }
-                // Small extra buffer for rendering
-                await delay(2000);
-                return document.body.innerHTML;
-                """
-                
-                result = await crawler.arun(url=url, config=config, js_code=js_code)
-                
-                if result.success:
-                    entries = self._parse_listing(result.html, url)
-                    if entries:
-                        return entries
-                    logger.warning("income_tax_crawl4ai_no_entries", url=url)
-                else:
-                    logger.warning("income_tax_crawl4ai_failed", url=url, err=result.error_message)
-        except Exception as e:
-            logger.warning("income_tax_crawl4ai_exception", url=url, err=str(e))
-
-        # FALLBACK: Try direct httpx if Crawl4AI is blocked or empty
-        logger.info("income_tax_fallback_httpx", url=url)
-        try:
-            resp = await self._get(url)
-            return self._parse_listing(resp.text, url)
-        except Exception as e:
-            logger.error("income_tax_fallback_httpx_failed", url=url, err=str(e))
-            return []
-
-    def _parse_listing(self, html: str, current_url: str) -> list[dict]:
-        """Parse notification entries using card patterns."""
-        entries = []
-        soup = BeautifulSoup(html, 'html.parser')
-        
-        # Target the specific card structure seen in the snippet
-        cards = soup.select('div.sections-item, div.card-body')
-        for card in cards:
-            # Title is typically in a span with text-decoration-none or fw-bold
-            title_tag = card.find('span', class_=re.compile(r'text-decoration-none|fw-bold', re.IGNORECASE))
-            if not title_tag:
-                title_tag = card.find(['h5', 'a'], class_=re.compile(r'card-title', re.IGNORECASE))
-            
-            if not title_tag: continue
-            title = title_tag.get_text(strip=True)
-            
-            portal_url = None
-            if title_tag.name == 'a' and title_tag.get('href'):
-                portal_url = urljoin(current_url, title_tag.get('href'))
-
-            # Date is in a div with class 'small' (e.g., April 10th, 2026)
-            date_tag = card.find('div', class_='small')
-            
-            # URL resolution
-            link_tag = card.find('a', href=re.compile(r'/documents/d/guest/.*|/Documents/d/guest/.*|.*\.pdf$', re.IGNORECASE))
-            if not link_tag:
-                link_tag = card.find_parent('a', href=True)
-            
-            full_url = None
-            notification_number = ""
-            
-            # Extract notification number if possible
-            num_match = re.search(r'(?:Notification|Circular) No\.\s*([\d/]+)', title, re.IGNORECASE)
-            if num_match:
-                notification_number = num_match.group(1)
-
-            if link_tag and link_tag.get('href'):
-                full_url = urljoin(current_url, link_tag.get('href'))
-            else:
-                # Fallback: Slug generation confirmed by user
-                # Working patterns are inconsistent, so we try multiple
-                slug_match = re.search(r'(?:Notification|Circular) No\.\s*(\d+)\s*/\s*(\d+)', title, re.IGNORECASE)
-                if slug_match:
-                    num, year = slug_match.groups()
-                    doc_type = "notification" if "notification" in title.lower() else "circular"
-                    
-                    variations = []
-                    if doc_type == "notification":
-                        # Variations for Notifications
-                        variations.extend([
-                            f"https://www.incometaxindia.gov.in/documents/d/guest/ennotification-no-{num}-{year}-pdf",
-                            f"https://www.incometaxindia.gov.in/documents/d/guest/notification-{num}-{year}-pdf",
-                            f"https://www.incometaxindia.gov.in/documents/d/guest/en-notification-no-{num}-{year}-pdf",
-                            f"https://www.incometaxindia.gov.in/documents/d/guest/notification-no-{num}-{year}-pdf",
-                        ])
-                    else:
-                        # Variations for Circulars
-                        variations.extend([
-                            f"https://www.incometaxindia.gov.in/documents/d/guest/circular-{num}-{year}-pdf",
-                            f"https://www.incometaxindia.gov.in/documents/d/guest/circular-no-{num}-{year}-pdf",
-                            f"https://www.incometaxindia.gov.in/documents/d/guest/encircular-{num}-{year}-pdf",
-                            f"https://www.incometaxindia.gov.in/documents/d/guest/encircular-no-{num}-{year}-pdf",
-                        ])
-                    full_url = variations
-                else:
-                    # Generic slug for non-numbered items
-                    clean_title = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')
-                    full_url = f"https://www.incometaxindia.gov.in/documents/d/guest/{clean_title}-pdf"
-            
-            if full_url:
-                # Filter for relevant document types
-                if any(k in title.lower() for k in ["notification", "circular", "order", "instruction", "corrigendum", "f. no"]):
-                    if not any(k in title.lower() for k in ["directory", "chart", "charter", "about us", "contact us", "help"]):
-                        entries.append({
-                            "title": title,
-                            "url": full_url,
-                            "notification_number": notification_number,
-                            "portal_url": portal_url
-                        })
-                
-        return entries
+    def _get_field_value(self, item: dict, field_name: str) -> str | None:
+        """Helper to get a field's raw data."""
+        for f in item.get('contentFields', []):
+            if f['name'] == field_name:
+                return f['contentFieldValue'].get('data')
+        return None
