@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from govnotify.api.deps import get_current_user, get_db
 from govnotify.utils.time import get_utc_now, get_today_str
-from govnotify.constants import NoticeCategory, HIDE_BEFORE_DATETIME
+from govnotify.constants import NoticeCategory, HIDE_BEFORE_DATETIME, get_source_name
 from govnotify.storage.postgres import (
     CategoryDigestORM,
     DigestORM,
@@ -75,6 +75,7 @@ class DigestsListResponse(BaseModel):
 class NoticeDetailResponse(BaseModel):
     id: str
     source_id: str
+    source_name: str = ""
     source_url: str
     fetch_url: Optional[str] = None
     title: str
@@ -144,7 +145,7 @@ def _orm_to_digest_response(orm: CategoryDigestORM) -> CategoryDigestResponse:
                 summary=summary_raw,
                 summary_hindi=summary_hi,
                 category=item.get("category", orm.category),
-                source_name=item.get("source_name", ""),
+                source_name=get_source_name(item.get("source_id", "")) if not item.get("source_name") else item.get("source_name"),
                 source_url=item.get("source_url", ""),
                 ingested_at=item.get("ingested_at"),
                 regions=item.get("regions", []),
@@ -186,7 +187,7 @@ async def list_sources_public(
     )
     sources = result.scalars().all()
     return SourcesPublicListResponse(
-        sources=[SourcePublicResponse(id=s.id, name=s.name) for s in sources]
+        sources=[SourcePublicResponse(id=s.id, name=get_source_name(s.id)) for s in sources]
     )
 
 
@@ -330,9 +331,12 @@ async def feed_latest(
     impact_level: Optional[str] = Query(None, description="high_only to show Critical/High"),
     audience: Optional[str] = None,
     date: Optional[str] = None, # YYYY-MM-DD
+    feed_type: str = Query("news", regex="^(news|official)$"),
     db: AsyncSession = Depends(get_db),
 ):
     """Get latest notices, paginated. Optionally filter by category, source, date, impact, audience."""
+    from govnotify.storage.postgres import SourceORM
+    
     filters = [
         DocumentORM.is_duplicate == False, # noqa: E712
         DocumentORM.ingested_at >= HIDE_BEFORE_DATETIME,
@@ -358,8 +362,19 @@ async def feed_latest(
         except ValueError:
             pass
 
-    query = select(DocumentORM).where(and_(*filters))
-    count_query = select(func.count(DocumentORM.id)).where(and_(*filters))
+    # Feed type filtering via SourceORM join
+    if feed_type == "news":
+        filters.append(SourceORM.crawler_config["is_news"].astext == "true")
+    else:
+        # official: either is_news is false or doesn't exist
+        filters.append(
+            (SourceORM.crawler_config["is_news"].astext == None) | 
+            (SourceORM.crawler_config["is_news"].astext == "false")
+        )
+
+    from sqlalchemy.orm import joinedload
+    query = select(DocumentORM).join(SourceORM).options(joinedload(DocumentORM.source)).where(and_(*filters))
+    count_query = select(func.count(DocumentORM.id)).join(SourceORM).where(and_(*filters))
         
     # Count
     total_result = await db.execute(count_query)
@@ -380,6 +395,7 @@ async def feed_latest(
         NoticeDetailResponse(
             id=str(doc.id),
             source_id=doc.source_id,
+            source_name=get_source_name(doc.source_id),
             source_url=str(doc.source_url) if doc.source_url else "",
             fetch_url=doc.fetch_url,
             title=doc.title,
@@ -415,11 +431,14 @@ async def feed_search(
     impact_level: Optional[str] = Query(None, description="high_only to show Critical/High"),
     audience: Optional[str] = None,
     date: Optional[str] = None, # YYYY-MM-DD
+    feed_type: str = Query("news", regex="^(news|official)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
 ):
     """Search notices by text query."""
+    from govnotify.storage.postgres import SourceORM
+    
     filters = [
         DocumentORM.is_duplicate == False, # noqa: E712
         DocumentORM.ingested_at >= HIDE_BEFORE_DATETIME,
@@ -449,9 +468,20 @@ async def feed_search(
             filters.append(func.date(DocumentORM.ingested_at) == target_date)
         except ValueError:
             pass
+
+    # Feed type filtering via SourceORM join
+    if feed_type == "news":
+        filters.append(SourceORM.crawler_config["is_news"].astext == "true")
+    else:
+        # official: either is_news is false or doesn't exist
+        filters.append(
+            (SourceORM.crawler_config["is_news"].astext == None) | 
+            (SourceORM.crawler_config["is_news"].astext == "false")
+        )
         
-    query = select(DocumentORM).where(and_(*filters))
-    count_query = select(func.count(DocumentORM.id)).where(and_(*filters))
+    from sqlalchemy.orm import joinedload
+    query = select(DocumentORM).join(SourceORM).options(joinedload(DocumentORM.source)).where(and_(*filters))
+    count_query = select(func.count(DocumentORM.id)).join(SourceORM).where(and_(*filters))
     
     # Count
     total_result = await db.execute(count_query)
@@ -472,6 +502,7 @@ async def feed_search(
         NoticeDetailResponse(
             id=str(doc.id),
             source_id=doc.source_id,
+            source_name=get_source_name(doc.source_id),
             source_url=str(doc.source_url) if doc.source_url else "",
             fetch_url=doc.fetch_url,
             title=doc.title,
@@ -532,8 +563,9 @@ async def notice_detail(
     db: AsyncSession = Depends(get_db),
 ):
     """Get full detail of a single notice by ID."""
+    from sqlalchemy.orm import joinedload
     result = await db.execute(
-        select(DocumentORM).where(DocumentORM.id == notice_id)
+        select(DocumentORM).options(joinedload(DocumentORM.source)).where(DocumentORM.id == notice_id)
     )
     doc = result.scalar_one_or_none()
     
@@ -543,7 +575,8 @@ async def notice_detail(
     return NoticeDetailResponse(
         id=str(doc.id),
         source_id=doc.source_id,
-        source_url=str(doc.source_url),
+        source_name=doc.source.name if doc.source else doc.source_id,
+        source_url=str(doc.source_url) if doc.source_url else "",
         fetch_url=doc.fetch_url,
         title=doc.title,
         clean_text=doc.clean_text or "",

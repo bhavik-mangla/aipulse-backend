@@ -20,7 +20,7 @@ from typing import Any, Optional, Sequence
 import structlog
 
 from govnotify.config import get_settings
-from govnotify.constants import NoticeCategory
+from govnotify.constants import NoticeCategory, get_source_name
 from govnotify.models.document import ProcessedDocument
 from govnotify.models.notification import CategoryDigest, NotificationItem
 from govnotify.utils.time import get_utc_now
@@ -151,7 +151,7 @@ class CategoryDigestGenerator:
                 doc.clean_text[:300] if doc.clean_text else ""),
             category=category,
             source_id=doc.source_id,
-            source_name=doc.source_id,
+            source_name=get_source_name(doc.source_id),
             source_url=doc.source_url,
             regions=doc.regions,
             departments=doc.departments,

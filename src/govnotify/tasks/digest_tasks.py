@@ -97,6 +97,7 @@ async def _generate_all_category_digests_async(task, date_str: str | None):
         return {"date": today, "status": "locked"}
 
     try:
+        from govnotify.storage.postgres import SourceORM
         engine = get_engine()
         session_factory = get_session_factory(engine)
         async with session_factory() as session:
@@ -104,10 +105,16 @@ async def _generate_all_category_digests_async(task, date_str: str | None):
             now = get_utc_now()
             start_time = now - timedelta(hours=24)
             
+            # Official only: is_news is not true
             stmt = (
                 select(DocumentORM)
+                .join(SourceORM)
                 .where(DocumentORM.ingested_at >= start_time)
                 .where(DocumentORM.is_duplicate == False)  # noqa: E712
+                .where(
+                    (SourceORM.crawler_config["is_news"].astext == None) | 
+                    (SourceORM.crawler_config["is_news"].astext == "false")
+                )
                 .order_by(DocumentORM.ingested_at.desc())
             )
             result = await session.execute(stmt)
@@ -334,7 +341,7 @@ async def _assemble_and_send_user_digests_async(task, date_str: str | None):
                     users.append(profile)
 
                 # Assemble user digests (zero LLM calls)
-                user_digests = assembler.assemble_batch(
+                user_digests = await assembler.assemble_batch(
                     users=users,
                     category_digests=category_digests,
                     date_str=today,

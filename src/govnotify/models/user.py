@@ -41,6 +41,9 @@ class UserPreferences(BaseModel):
     high_impact_only: bool = Field(
         default=False, description="Filter for Critical/High impact only"
     )
+    include_general_news: bool = Field(
+        default=False, description="Include news from general outlets in digests"
+    )
     language: str = Field(
         default="en", description="Preferred language for summaries"
     )

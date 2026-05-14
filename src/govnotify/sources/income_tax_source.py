@@ -86,50 +86,65 @@ class IncomeTaxSource(WebScrapeSource):
                 items = resp.json().get('items', [])
                 
                 for item in items:
-                    title = item.get('title', '').strip()
-                    if not title: continue
+                    try:
+                        title = item.get('title', '').strip()
+                        if not title: continue
 
-                    # 1. Deterministic PDF URL Extraction from Metadata
-                    pdf_url = self._extract_pdf_from_meta(item)
-                    
-                    # 2. Content Fallback (extracting text from description if no PDF)
-                    content = title
-                    content_type = "text/html"
-                    
-                    if pdf_url:
-                        # Pass title to leverage early deduplication check in base.py
-                        extracted_pdf = await self._fetch_pdf_content(pdf_url, title=title)
-                        if extracted_pdf == "DUPLICATE_SKIPPED":
-                            continue
-                        if extracted_pdf:
-                            content = extracted_pdf
-                            content_type = "application/pdf"
-                    else:
-                        # Fallback: Use HTML/Plain text content from fields if PDF is missing
-                        desc = self._get_field_value(item, "description") or self._get_field_value(item, "shortDescription")
-                        if desc:
-                            content = desc
-                            content_type = "text/html"
+                        # 1. Deterministic PDF URL Extraction from Metadata
+                        pdf_url = self._extract_pdf_from_meta(item)
+                        
+                        # 2. Content Fallback (extracting text from description/content if no PDF)
+                        content = title
+                        content_type = "text/html"
+                        
+                        if pdf_url:
+                            # Pass title to leverage early deduplication check in base.py
+                            extracted_pdf = await self._fetch_pdf_content(pdf_url, title=title)
+                            if extracted_pdf == "DUPLICATE_SKIPPED":
+                                continue
+                            if extracted_pdf:
+                                content = extracted_pdf
+                                content_type = "application/pdf"
+                        else:
+                            # Fallback: Use HTML/Plain text content from fields if PDF is missing
+                            # Prioritize documentContent for items that have no PDF attachment
+                            desc = (
+                                self._get_field_value(item, "documentContent") or 
+                                self._get_field_value(item, "description") or 
+                                self._get_field_value(item, "shortDescription")
+                            )
+                            if desc:
+                                content = desc
+                                content_type = "text/html"
 
-                    doc = self.create_raw_document(
-                        title=title,
-                        fetch_url=pdf_url or item.get('itemURL'),
-                        raw_content=content,
-                        content_type=content_type,
-                        metadata={
-                            "category": cat_name,
-                            "portal_url": str(self._config.url),
-                            "article_id": item.get('id'),
-                            "date_modified": item.get('dateModified')
-                        },
-                    )
+                        fetch_url = pdf_url or item.get('itemURL')
+                        if not fetch_url:
+                            # Fallback to API URL if no portal URL is found to avoid validation error
+                            article_id = item.get('id')
+                            fetch_url = f"{INCOME_TAX_BASE_URL}/o/headless-delivery/v1.0/structured-contents/{article_id}"
 
-                    if doc.content_hash not in seen_hashes and await self.validate_response(doc):
-                        seen_hashes.add(doc.content_hash)
-                        yield doc
-                        yielded += 1
-                        if yielded >= limit:
-                            return
+                        doc = self.create_raw_document(
+                            title=title,
+                            fetch_url=fetch_url,
+                            raw_content=content,
+                            content_type=content_type,
+                            metadata={
+                                "category": cat_name,
+                                "portal_url": str(self._config.url),
+                                "article_id": item.get('id'),
+                                "date_modified": item.get('dateModified')
+                            },
+                        )
+
+                        if doc.content_hash not in seen_hashes and await self.validate_response(doc):
+                            seen_hashes.add(doc.content_hash)
+                            yield doc
+                            yielded += 1
+                            if yielded >= limit:
+                                return
+                    except Exception as item_exc:
+                        logger.error("income_tax_item_failed", title=item.get('title'), error=str(item_exc))
+                        continue
 
             except Exception as exc:
                 logger.error("income_tax_category_failed", category=cat_name, error=str(exc))

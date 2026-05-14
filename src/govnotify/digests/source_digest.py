@@ -14,6 +14,7 @@ import structlog
 from govnotify.models.document import ProcessedDocument
 from govnotify.models.notification import SourceDigest, NotificationItem
 from govnotify.utils.time import get_utc_now
+from govnotify.constants import get_source_name
 
 logger = structlog.get_logger(__name__)
 
@@ -96,7 +97,7 @@ class SourceDigestGenerator:
             summary=doc.summary,
             category=doc.primary_category,
             source_id=doc.source_id,
-            source_name=doc.source_id.upper(), # Default to ID
+            source_name=get_source_name(doc.source_id),
             source_url=doc.source_url,
             ingested_at=doc.ingested_at,
             regions=doc.regions,

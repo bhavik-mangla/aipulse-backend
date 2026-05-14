@@ -139,12 +139,12 @@ class WebScrapeSource(AbstractSource, ABC):
             try:
                 async with self._rate_limiter:
                     # Logic:
-                    # 1. First attempt: Direct (unless use_proxy is forced)
+                    # 1. First attempt: Direct (unless use_proxy is forced) or use explicit proxy
                     # 2. Subsequent attempts: Try different proxies
                     # 3. Final attempt: Try direct as a last resort
                     
-                    proxy = None
-                    if use_proxy or (attempt > 0 and attempt < max_retries - 1):
+                    proxy = kwargs.get("proxy")
+                    if not proxy and (use_proxy or (attempt > 0 and attempt < max_retries - 1)):
                         proxy = await proxy_manager.get_proxy()
                         if proxy:
                             logger.info("using_proxy_retry", url=url, proxy=proxy, attempt=attempt+1)
@@ -156,10 +156,15 @@ class WebScrapeSource(AbstractSource, ABC):
                         "http2": not proxy, # Disable HTTP/2 for free proxies
                     }
                     if proxy:
-                        client_kwargs["proxy"] = proxy
+                        client_kwargs["mounts"] = {
+                            "http://": httpx.AsyncHTTPTransport(proxy=proxy),
+                            "https://": httpx.AsyncHTTPTransport(proxy=proxy),
+                        }
                         
                     async with httpx.AsyncClient(**client_kwargs) as client:
-                        resp = await client.get(url, **kwargs)
+                        # Ensure we don't pass 'proxy' to get() if it's in kwargs
+                        get_kwargs = {k: v for k, v in kwargs.items() if k != "proxy"}
+                        resp = await client.get(url, **get_kwargs)
                     
                     if resp.status_code in (429, 503, 418):
                         self._rate_limiter.backoff(attempt + 1)

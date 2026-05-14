@@ -6,11 +6,11 @@
       name="viewport"
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>GovNotify | Citizen Intelligence</title>
+    <title>AI Pulse</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=IBM+Plex+Sans:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;700;800&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Noto+Sans+Devanagari:wght@400;700;800&display=swap"
       rel="stylesheet"
     />
     <style>
@@ -70,7 +70,7 @@
       }
 
       nav {
-        padding: 0.75rem 0;
+        padding: 0.85rem 0;
         border-bottom: 1px solid var(--border);
         background: var(--bg);
         backdrop-filter: blur(20px);
@@ -82,20 +82,41 @@
         display: flex;
         justify-content: space-between;
         align-items: center;
+        gap: 20px;
+      }
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        overflow: hidden;
       }
       .logo {
-        font-size: 1.2rem;
-        font-weight: 800;
+        font-size: 1.6rem;
+        font-weight: 900;
         color: var(--primary);
         text-decoration: none;
         display: flex;
         align-items: center;
-        gap: 4px;
+        letter-spacing: -0.04em;
         white-space: nowrap;
         flex-shrink: 0;
       }
       .logo span {
         color: var(--text);
+        font-weight: 700;
+      }
+      .brand-text {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      #hero-title {
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin: 0;
+        color: var(--text-muted);
+        line-height: 1.2;
+        letter-spacing: -0.01em;
       }
 
       .nav-actions {
@@ -342,6 +363,31 @@
         letter-spacing: 0.05em;
         font-family: "IBM Plex Sans", sans-serif;
       }
+      .feed-type-toggle {
+        display: flex;
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 4px;
+        margin: 0 auto 24px auto;
+        width: fit-content;
+      }
+      .feed-type-btn {
+        padding: 8px 20px;
+        border-radius: 8px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-weight: 700;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: var(--transition);
+      }
+      .feed-type-btn.active {
+        background: var(--primary);
+        color: #fff;
+      }
+
       .badge-primary {
         background: rgba(56, 189, 248, 0.1);
         color: var(--primary);
@@ -491,24 +537,16 @@
         nav {
           padding: 0.5rem 0;
         }
+        .nav-inner {
+          height: auto;
+          padding: 8px 0;
+        }
         .logo {
           font-size: 1.1rem;
         }
         .btn-subscribe {
           padding: 6px 12px;
           font-size: 0.75rem;
-        }
-        .hero {
-          padding: 40px 0 30px 0;
-        }
-        .hero h1 {
-          font-size: 1.75rem;
-        }
-        .hero p {
-          font-size: 1rem;
-        }
-        .feed-header-top h2 {
-          font-size: 1.2rem;
         }
         .feed-filters {
           gap: 8px;
@@ -599,7 +637,13 @@
   <body>
     <nav>
       <div class="container nav-inner">
-        <a href="/" class="logo">🏛️ Gov<span>Notify</span></a>
+        <div class="brand">
+          <a href="/" class="logo">AI<span>Pulse</span></a>
+          <div class="brand-text">
+            <span id="header-date" style="font-size: 0.65rem; font-weight: 700; color: var(--primary); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;"></span>
+            <h1 id="hero-title" style="font-size: 0.85rem; font-weight: 600; margin: 0; color: var(--text-muted); line-height: 1.2; letter-spacing: -0.01em;">Real-time news & policy pulse.</h1>
+          </div>
+        </div>
         <div class="nav-actions">
           <button onclick="toggleLang()" class="btn-icon" id="lang-btn">
             हिन्दी
@@ -616,26 +660,14 @@
       </div>
     </nav>
 
-    <div class="hero">
-      <div class="container">
-        <h1 id="hero-title">Stay ahead of government updates.</h1>
-        <p id="hero-desc">
-          Official daily notifications with short summary from government
-          portals.
-        </p>
-      </div>
-    </div>
-
     <main class="container">
       <div class="feed-header">
-        <div class="feed-header-top">
-          <h2 id="feed-title">Latest Intel</h2>
-          <span
-            id="total-count"
-            class="badge-count"
-            >0 Records</span
-          >
+        <div class="feed-type-toggle">
+          <button id="btn-type-news" class="feed-type-btn active" onclick="setFeedType('news')">General</button>
+          <button id="btn-type-official" class="feed-type-btn" onclick="setFeedType('official')">Official</button>
         </div>
+
+
         <div class="feed-filters">
           <select id="sel-src" class="filter-select" onchange="resetAndFetch()">
             <option value="" id="opt-all-portals">All Portals</option>
@@ -679,7 +711,7 @@
           Note: Since we are in beta, please check your Spam/Junk folder for daily digests and mark them as "Not Spam" to ensure delivery.
         </p>
         <p style="margin: 0;">
-          <strong>Disclaimer:</strong> GovNotify is an independent, non-profit initiative for citizen awareness and is NOT affiliated with, endorsed by, or an official representative of any government entity. Information is aggregated daily via automated scraping from public domains and provided "as is" for informational purposes only. Do not make decisions based solely on AI-generated content—always verify with the official source. Released under MIT License.
+          <strong>Disclaimer:</strong> AI Pulse is an independent, non-profit initiative for citizen awareness and is NOT affiliated with, endorsed by, or an official representative of any government entity. Information is aggregated daily via automated scraping from public domains and provided "as is" for informational purposes only. Do not make decisions based solely on AI-generated content—always verify with the official source. Released under MIT License.
         </p>
       </div>
     </footer>
@@ -788,7 +820,12 @@
               <div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 16px;">
                 <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
                   <input type="checkbox" id="sub-high-impact" style="width: 18px; height: 18px; accent-color: var(--primary);">
-                  <span>Only send High Impact alerts 🚨</span>
+                  <span>Only High Impact alerts 🚨</span>
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
+                  <input type="checkbox" id="sub-general-news" style="width: 18px; height: 18px; accent-color: var(--primary);">
+                  <span>Include General news 🗞️</span>
                 </label>
                 
                 <div>
@@ -897,14 +934,15 @@
         { id: "other", en: "Other", hi: "अन्य" }
       ];
       let IMPACT_TIERS = ["Critical", "High", "Medium", "Low"];
+      let ALL_SOURCES = [];
+      let feedType = "news";
 
       // Global filter to hide old/inconsistent data from before official launch
       const HIDE_BEFORE_DATE = new Date("2026-05-02T00:00:00Z");
 
       const I18N = {
         en: {
-          heroTitle: "Stay ahead of government updates.",
-          heroDesc: "Official daily notifications with short summary from government portals.",
+          heroTitle: "Real-time news & policy pulse.",
           feedTitle: "Latest Intel",
           allPortals: "All Portals",
           allCats: "All Categories",
@@ -929,10 +967,13 @@
           validEmail: "Enter a valid email",
           selectPortal: "Select at least one portal",
           subSuccess: "Subscription success updated or created",
+          news: "General",
+          official: "Official",
+          heroTitleGeneral: "High-signal news, simplified.",
+          heroTitleOfficial: "Official updates, decoded."
         },
         hi: {
-          heroTitle: "सरकारी अपडेट्स के साथ आगे रहें।",
-          heroDesc: "सरकारी पोर्टल्स से संक्षिप्त सारांश के साथ आधिकारिक दैनिक सूचनाएं।",
+          heroTitle: "वास्तविक समय समाचार और नीति पल्स।",
           feedTitle: "नवीनतम जानकारी",
           allPortals: "सभी पोर्टल",
           allCats: "सभी श्रेणियां",
@@ -957,6 +998,10 @@
           validEmail: "एक मान्य ईमेल दर्ज करें",
           selectPortal: "कम से कम एक पोर्टल चुनें",
           subSuccess: "सदस्यता सफलतापूर्वक अपडेट या बनाई गई",
+          news: "सामान्य",
+          official: "आधिकारिक",
+          heroTitleGeneral: "महत्वपूर्ण समाचार, सरल भाषा में।",
+          heroTitleOfficial: "आधिकारिक अपडेट, डिकोड किया गया।"
         },
       };
 
@@ -968,8 +1013,17 @@
         }
       }
 
+      function updateDate() {
+        const now = new Date();
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        const dateString = now.toLocaleDateString('en-US', options);
+        const dateEl = document.getElementById("header-date");
+        if (dateEl) dateEl.textContent = dateString;
+      }
+
       async function init() {
         trackVisit();
+        updateDate();
         setTheme(localStorage.getItem("gov_theme") || "light");
         // Initial setup with fallbacks
         setLang(currentLang);
@@ -1025,17 +1079,10 @@
 
         const t = I18N[l];
         const heroTitle = document.getElementById("hero-title");
-        if (heroTitle) heroTitle.textContent = t.heroTitle;
-        
-        const heroDesc = document.getElementById("hero-desc");
-        if (heroDesc) heroDesc.textContent = t.heroDesc;
-        
-        const feedTitle = document.getElementById("feed-title");
-        if (feedTitle) feedTitle.textContent = t.feedTitle;
-        
-        const optPortals = document.getElementById("opt-all-portals");
-        if (optPortals) optPortals.textContent = t.allPortals;
-        
+        if (heroTitle) {
+          heroTitle.textContent = feedType === "news" ? t.heroTitleGeneral : t.heroTitleOfficial;
+        }
+
         const optCats = document.getElementById("opt-all-cats");
         if (optCats) optCats.textContent = t.allCats;
         
@@ -1095,7 +1142,8 @@
         const subLang = document.getElementById("sub-lang");
         if (subLang) subLang.value = l;
         
-        updateRecordCountText();
+        renderSourceFilters();
+        updateButtonText();
       }
 
       function toggleLang() {
@@ -1103,11 +1151,24 @@
         fetchFeed();
       }
 
-      function updateRecordCountText() {
-        const el = document.getElementById("total-count");
-        if (!el) return;
-        const count = el.textContent.split(" ")[0];
-        el.textContent = `${count} ${I18N[currentLang].records}`;
+      function setFeedType(type) {
+        feedType = type;
+        document.getElementById("btn-type-news").classList.toggle("active", type === "news");
+        document.getElementById("btn-type-official").classList.toggle("active", type === "official");
+        
+        const t = I18N[currentLang];
+        document.getElementById("hero-title").textContent = type === "news" ? t.heroTitleGeneral : t.heroTitleOfficial;
+
+        renderSourceFilters();
+        resetAndFetch();
+      }
+
+      function updateButtonText() {
+        // Update toggle button text based on language
+        const btnNews = document.getElementById("btn-type-news");
+        const btnOfficial = document.getElementById("btn-type-official");
+        if (btnNews) btnNews.textContent = I18N[currentLang].news;
+        if (btnOfficial) btnOfficial.textContent = I18N[currentLang].official;
       }
 
       function toggleHighImpact() {
@@ -1145,6 +1206,7 @@
         const audiences = Array.from(document.querySelectorAll(".aud-chip-input:checked")).map((a) => a.value);
         const subLang = document.getElementById("sub-lang").value;
         const highImpactOnly = document.getElementById("sub-high-impact").checked;
+        const includeGeneralNews = document.getElementById("sub-general-news").checked;
 
         try {
           const res = await fetch(`${API}/auth/access`, {
@@ -1158,11 +1220,11 @@
               preferences: {
                 delivery_channels: ["email"],
                 high_impact_only: highImpactOnly,
+                include_general_news: includeGeneralNews,
                 audiences: audiences
               },
             }),
           });
-
           if (res.ok) {
             toast(t.subSuccess, "success");
             setTimeout(() => { hideSubscribeModal(); }, 1500);
@@ -1202,30 +1264,44 @@
           const res = await fetch(`${API}/sources`);
           if (!res.ok) throw new Error("Sources fetch failed");
           const d = await res.json();
-          const grid = document.getElementById("src-grid");
-          const sel = document.getElementById("sel-src");
-          const sources = d.sources || [];
-
-          if (sel) {
-            sel.innerHTML = `<option value="" id="opt-all-portals">${I18N[currentLang].allPortals}</option>`;
-            sources.forEach((s) => {
-              const opt = document.createElement("option");
-              opt.value = s.id;
-              opt.textContent = s.name;
-              sel.appendChild(opt);
-            });
-          }
-
-          if (grid) {
-            grid.innerHTML = "";
-            sources.forEach((s) => {
-              const chip = document.createElement("div");
-              chip.innerHTML = `<input type="checkbox" id="s-${s.id}" class="src-chip-input" value="${s.id}" style="display:none;"><label for="s-${s.id}" style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:0.7rem; font-weight:700; cursor:pointer;" onclick="toggleChip(this)">${s.name}</label>`;
-              grid.appendChild(chip);
-            });
-          }
+          ALL_SOURCES = d.sources || [];
+          renderSourceFilters();
         } catch (e) { console.error("fetchSources failed", e); }
       }
+
+      function renderSourceFilters() {
+        const sel = document.getElementById("sel-src");
+        const grid = document.getElementById("src-grid");
+        const t = I18N[currentLang];
+
+        if (sel) {
+          const currentVal = sel.value;
+          sel.innerHTML = `<option value="" id="opt-all-portals">${t.allPortals}</option>`;
+          
+          const filtered = ALL_SOURCES.filter(s => {
+            const isNewsSource = s.id.includes('top_stories');
+            return feedType === "news" ? isNewsSource : !isNewsSource;
+          });
+
+          filtered.forEach((s) => {
+            const opt = document.createElement("option");
+            opt.value = s.id;
+            opt.textContent = s.name;
+            sel.appendChild(opt);
+          });
+          sel.value = filtered.find(s => s.id === currentVal) ? currentVal : "";
+        }
+
+        if (grid) {
+          grid.innerHTML = "";
+          ALL_SOURCES.forEach((s) => {
+            const chip = document.createElement("div");
+            chip.innerHTML = `<input type="checkbox" id="s-${s.id}" class="src-chip-input" value="${s.id}" style="display:none;"><label for="s-${s.id}" style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:0.7rem; font-weight:700; cursor:pointer;" onclick="toggleChip(this)">${s.name}</label>`;
+            grid.appendChild(chip);
+          });
+        }
+      }
+
       function toggleChip(l) {
         setTimeout(() => {
           const cb = document.getElementById(l.getAttribute("for"));
@@ -1246,8 +1322,8 @@
         const audience = document.getElementById("sel-audience")?.value || "";
         const date = document.getElementById("filter-date")?.value || "";
         
-        let url = `${API}/feed/latest?page=${page}&page_size=12`;
-        if (q) url = `${API}/feed/search?q=${encodeURIComponent(q)}&page=${page}&page_size=12`;
+        let url = `${API}/feed/latest?page=${page}&page_size=12&feed_type=${feedType}`;
+        if (q) url = `${API}/feed/search?q=${encodeURIComponent(q)}&page=${page}&page_size=12&feed_type=${feedType}`;
         
         if (src) url += (url.includes("?") ? "&" : "?") + `source_id=${src}`;
         if (cat) url += (url.includes("?") ? "&" : "?") + `category=${cat}`;
@@ -1261,8 +1337,6 @@
           const d = await res.json();
           renderFeed(d.items || []);
           renderPagination(d.total || 0);
-          const el = document.getElementById("total-count");
-          if (el) el.textContent = `${d.total || 0} ${I18N[currentLang].records}`;
         } catch (e) {
           container.innerHTML = `<p>${I18N[currentLang].errorLoading}</p>`;
         }
@@ -1284,12 +1358,13 @@
               .join("");
 
             const displayTitle = oneLiner || item.title;
+            const isNews = feedType === "news";
 
             return `
                 <div class="feed-item" onclick="showFullContent('${item.id}')" style="${isHigh ? 'border-color: var(--error);' : ''}">
                     <a href="${item.fetch_url || item.source_url}" target="_blank" class="icon-link" onclick="event.stopPropagation()">↗</a>
                     <div class="feed-meta">
-                        <span class="badge badge-primary">${(item.source_id || "GOV").toUpperCase()}</span>
+                        <span class="badge badge-primary">${(item.source_name || item.source_id || "GOV").toUpperCase()}</span>
                         <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">${formatDate(item.ingested_at)}</span>
                     </div>
                     <h3 class="item-title">${displayTitle}</h3>
@@ -1359,7 +1434,8 @@
           const d = await res.json();
           
           let metaHtml = `<div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">`;
-          metaHtml += `<span class="badge badge-primary">${d.source_id.toUpperCase()}</span>`;
+          const isNews = d.source_id.includes('top_stories'); // Heuristic or we could use the field if returned
+          metaHtml += `<span class="badge badge-primary">${(d.source_name || d.source_id).toUpperCase()}</span>`;
           metaHtml += `<span style="font-size:0.8rem; color:var(--text-muted); font-weight:700;">${formatDate(d.ingested_at)}</span>`;
           
           if (d.affected_audience && d.affected_audience.length > 0) {
@@ -1370,10 +1446,10 @@
           metaHtml += `</div>`;
           meta.innerHTML = metaHtml;
 
-          const { oneLiner, bullets } = parseSummary(d.summary, currentLang);
+          const { bullets } = parseSummary(d.summary, currentLang);
           title.textContent = d.title;
-          body.innerHTML = (oneLiner || bullets)
-            ? `<div><p class="modal-quick-take">${oneLiner}</p><ul class="modal-bullets">${bullets}</ul></div>`
+          body.innerHTML = bullets
+            ? `<div><ul class="modal-bullets">${bullets}</ul></div>`
             : `<p>${I18N[currentLang].noSummary}</p>`;        } catch (e) { body.innerHTML = I18N[currentLang].errorContent; }
       }
 

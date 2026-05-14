@@ -13,6 +13,7 @@ from govnotify.sources.sebi_source import SEBISource
 from govnotify.sources.irdai_source import IRDAISource
 from govnotify.sources.ibbi_source import IBBISource
 from govnotify.sources.mca_source import MCASource
+from govnotify.sources.news_rss_source import NewsRSSSource
 
 __all__ = [
     "AbstractSource",
@@ -28,4 +29,5 @@ __all__ = [
     "IRDAISource",
     "IBBISource",
     "MCASource",
+    "NewsRSSSource",
 ]

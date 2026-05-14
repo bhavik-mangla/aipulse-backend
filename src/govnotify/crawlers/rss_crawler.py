@@ -13,7 +13,7 @@ import httpx
 import structlog
 
 from govnotify.crawlers.base import AbstractCrawler, CrawlResult
-from govnotify.sources.utils import DEFAULT_USER_AGENT
+from govnotify.constants import DEFAULT_USER_AGENT
 
 logger = structlog.get_logger(__name__)
 
