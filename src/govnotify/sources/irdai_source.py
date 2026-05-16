@@ -198,8 +198,10 @@ class IRDAISource(WebScrapeSource):
                         try:
                             data = json.loads(match.group(1))
                             for entry in data:
-                                if 'url' in entry:
-                                    pdf_urls.append(entry['url'])
+                                # Only add if it's explicitly a PDF to avoid rar/zip errors
+                                url_val = entry.get('url', '')
+                                if url_val and '.pdf' in url_val.lower():
+                                    pdf_urls.append(url_val)
                         except Exception:
                             pass
             
