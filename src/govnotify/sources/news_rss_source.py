@@ -141,6 +141,7 @@ def register_news_sources():
             name=cfg["name"],
             source_type=SourceType.RSS,
             url=cfg["url"],
+            schedule_cron="0 */6 * * *",
             crawler_class="govnotify.sources.news_rss_source.NewsRSSSource",
             crawler_config={"is_news": True},
             rate_limit_rpm=10
