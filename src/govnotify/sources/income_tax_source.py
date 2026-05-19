@@ -152,6 +152,51 @@ class IncomeTaxSource(WebScrapeSource):
 
         logger.info("income_tax_complete", total_yielded=yielded)
 
+    async def validate_response(self, response: RawDocument) -> bool:
+        """Add Income Tax specific quality checks: age and migration junk."""
+        # 1. Base validation
+        if not await super().validate_response(response):
+            return False
+            
+        # 2. Migration Junk check (avoid migration utility stubs)
+        if "Migration Utility" in response.raw_content:
+            logger.info("income_tax_skipping_migration_junk", title=response.title[:60])
+            return False
+            
+        # 3. Age check (extract year from title)
+        # We only want recent documents (current year and previous year)
+        current_year = datetime.now().year
+        # Find 4-digit years in title (19xx or 20xx)
+        years = [int(y) for y in re.findall(r'\b(19\d{2}|20\d{2})\b', response.title)]
+        
+        if not years:
+            return True
+
+        # If ANY year in the title is recent (current or previous year), we keep it.
+        # This prevents skipping "Notification No. 1/2026" because it mentions "Income Tax Act, 1961".
+        if any(yr >= current_year - 1 for yr in years):
+            return True
+
+        # If all mentioned years are old, we filter it out if it's an official document
+        # or if it's a very old general document.
+        for yr in years:
+            # Check if it's an official doc with this old year (e.g., "Circular No. X/2005")
+            is_official_doc_with_old_year = re.search(
+                r'(Circular|Notification|Press Release|Order).*\b' + str(yr) + r'\b', 
+                response.title, 
+                re.I
+            )
+            if is_official_doc_with_old_year:
+                logger.info("income_tax_skipping_old_official_doc", title=response.title[:60], year=yr)
+                return False
+            
+            # If it's just a general document with an old year and it's 5+ years old, skip it
+            if yr < current_year - 5:
+                logger.info("income_tax_skipping_very_old_doc", title=response.title[:60], year=yr)
+                return False
+                
+        return True
+
     def _extract_pdf_from_meta(self, item: dict) -> str | None:
         """Recursively find the definitive PDF URL in Liferay metadata."""
         fields = item.get('contentFields', [])
