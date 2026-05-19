@@ -62,8 +62,8 @@ graph TD
 
 1.  **Clone the Repo:**
     ```bash
-    git clone https://github.com/bhavik-mangla/aipulse.git
-    cd aipulse
+    git clone https://github.com/bhavik-mangla/aipulse-backend.git
+    cd aipulse-backend
     ```
 
 2.  **Environment Setup:**
