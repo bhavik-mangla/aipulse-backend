@@ -1,8 +1,8 @@
-# 🏛️ GovNotify India
+# 🏛️ AIPulse India
 
-**Empowering Indian Citizens with Deterministic Government Intel.**
+**Empowering Indian Citizens with Deterministic Intelligence from Government and General Sources.**
 
-GovNotify is a production-grade, extensible platform that ingests official Indian government notifications from dozens of sources, enriches them with AI-powered insights, and delivers personalized daily digests.
+AIPulse is a production-grade, extensible platform that ingests official Indian government notifications and general public interest data from dozens of sources, enriches them with AI-powered insights, and delivers personalized daily digests.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
@@ -12,20 +12,20 @@ GovNotify is a production-grade, extensible platform that ingests official India
 
 ## 🌟 The Challenge & Our Solution
 
-Modern government portals are often dynamic "React/Liferay black boxes." Standard scrapers fail due to inconsistent slugs, dynamic rendering, and hidden metadata.
+Modern information portals are often dynamic "React/Liferay black boxes." Standard scrapers fail due to inconsistent slugs, dynamic rendering, and hidden metadata.
 
-GovNotify takes a **deterministic approach**:
+AIPulse takes a **deterministic approach**:
 1.  **Reverse-Engineering internal APIs:** We bypass brittle DOM parsing and query the same Headless CMS endpoints used by the portal frontends.
-2.  **Taxonomy Mapping:** We use backend Category IDs to filter real legal notifications from simple calendar reminders.
-3.  **100% Accuracy:** By using internal document library paths, we eliminate 404 errors and ensure 1:1 matching with official sources.
+2.  **Taxonomy Mapping:** We use backend Category IDs to filter relevant updates and legal notifications from noise.
+3.  **100% Accuracy:** By using internal document library paths and direct API access, we eliminate 404 errors and ensure 1:1 matching with official sources.
 
 ---
 
 ## 🚀 Key Features
 
--   **Multi-Source Deterministic Ingestion:** RSS, OData APIs, and robust browser-mimic crawling.
+-   **Multi-Source Deterministic Ingestion:** RSS, OData APIs, and robust browser-mimic crawling across government and general news sources.
 -   **AI-Powered NLP Pipeline:**
-    *   **Classification:** Automatic categorization (Jobs, Tax, Health, etc.).
+    *   **Classification:** Automatic categorization (Jobs, Tax, Health, General News, etc.).
     *   **Dual-Language Summarization:** Quick-takes in both **English & Hindi**.
     *   **Impact Assessment:** Triage notifications by impact level (Critical/High/Medium).
 -   **Smart Deduplication:** Multi-layer engine using exact hash, near-duplicate (MinHash/LSH), and semantic checks.
@@ -49,7 +49,7 @@ GovNotify takes a **deterministic approach**:
 
 ```mermaid
 graph TD
-    Sources[Gov Portals / APIs] -->|Ingest| Crawler[Crawl4AI / API Client]
+    Sources[Gov Portals / General APIs] -->|Ingest| Crawler[Crawl4AI / API Client]
     Crawler -->|Raw Doc| Pipeline[NLP Pipeline]
     Pipeline -->|Summary / Embedding| DB[(PostgreSQL + Qdrant)]
     DB -->|Assembly| Digest[Digest Assembler]
@@ -62,8 +62,8 @@ graph TD
 
 1.  **Clone the Repo:**
     ```bash
-    git clone https://github.com/bhavik-mangla/govnotify.git
-    cd govnotify
+    git clone https://github.com/bhavik-mangla/aipulse.git
+    cd aipulse
     ```
 
 2.  **Environment Setup:**
@@ -92,6 +92,6 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ## 🤝 Contributing
 
-Contributions are welcome! Whether it's adding a new government source or improving the NLP pipeline, feel free to open a PR.
+Contributions are welcome! Whether it's adding a new source or improving the NLP pipeline, feel free to open a PR.
 
 *Built with ❤️ for a more informed India.*
