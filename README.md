@@ -8,12 +8,16 @@ AIPulse is a production-grade, extensible platform that ingests official Indian 
 
 ## 📥 Get the App
 
-<a href="https://play.google.com/store/apps/details?id=com.daily.aipulse">
-  <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80">
-</a>
+### **iOS (Public Beta)**
 <a href="https://apps.apple.com/us/app/ai-pulse-daily-short-news/id6770227108">
-  <img src="https://developer.apple.com/app-store/marketing/guidelines/images/badge-download-on-the-app-store.svg" height="54" style="margin-bottom: 13px;">
+  <img src="https://developer.apple.com/app-store/marketing/guidelines/images/badge-download-on-the-app-store.svg" height="54">
 </a>
+
+### **Android (Closed Testing)**
+To test the Android version, follow these steps:
+1. **Join the Testers Group**: [Join Google Group](https://groups.google.com/g/ai-pulse-testers) (Required for access).
+2. **Opt-in to Testing**: [Enable Testing on Play Store](https://play.google.com/apps/testing/com.daily.aipulse).
+3. **Download**: [Get it on Google Play](https://play.google.com/store/apps/details?id=com.daily.aipulse).
 
 **Mobile App Repository:** [ai-pulse-app](https://github.com/bhavik-mangla/ai-pulse-app)
 
