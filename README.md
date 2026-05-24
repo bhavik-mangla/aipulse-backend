@@ -4,6 +4,21 @@
 
 AIPulse is a production-grade, extensible platform that ingests official Indian government notifications and general public interest data from dozens of sources, enriches them with AI-powered insights, and delivers personalized daily digests.
 
+---
+
+## 📥 Get the App
+
+<a href="https://play.google.com/store/apps/details?id=com.daily.aipulse">
+  <img src="https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png" height="80">
+</a>
+<a href="https://apps.apple.com/us/app/ai-pulse-daily-short-news/id6770227108">
+  <img src="https://developer.apple.com/app-store/marketing/guidelines/images/badge-download-on-the-app-store.svg" height="54" style="margin-bottom: 13px;">
+</a>
+
+**Mobile App Repository:** [ai-pulse-app](https://github.com/bhavik-mangla/ai-pulse-app)
+
+---
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
