@@ -2,15 +2,8 @@
 GovNotify Pydantic models - single source of truth for all data shapes.
 """
 from govnotify.constants import NoticeCategory
-from govnotify.models.delivery import DeliveryResult
 from govnotify.models.document import (
-    DocumentChunk,
     ProcessedDocument,
-)
-from govnotify.models.notification import (
-    CategoryDigest,
-    NotificationItem,
-    UserDigest,
 )
 from govnotify.models.source import (
     RawDocument,
@@ -18,8 +11,6 @@ from govnotify.models.source import (
     SourceType,
 )
 from govnotify.models.user import (
-    DeliveryChannel,
-    DigestFrequency,
     UserPreferences,
     UserProfile,
 )
@@ -32,16 +23,7 @@ __all__ = [
     # document.py
     "NoticeCategory",
     "ProcessedDocument",
-    "DocumentChunk",
     # user.py
-    "DigestFrequency",
-    "DeliveryChannel",
     "UserPreferences",
     "UserProfile",
-    # notification.py
-    "CategoryDigest",
-    "NotificationItem",
-    "UserDigest",
-    # delivery.py
-    "DeliveryResult",
 ]

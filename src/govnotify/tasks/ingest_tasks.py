@@ -202,7 +202,7 @@ async def _ingest_single_source_async(task, source_id: str):
 
     try:
         source = SourceRegistry.get(source_id)
-        pipeline = ProcessingPipeline(skip_embeddings=True, enable_llm=settings.enable_llm)
+        pipeline = ProcessingPipeline(enable_llm=settings.enable_llm)
         
         fetched_count = 0
         new_count = 0
@@ -258,6 +258,8 @@ async def _ingest_single_source_async(task, source_id: str):
                             departments=doc.departments,
                             impact_tier=getattr(doc, "impact_tier", "Medium"),
                             affected_audience=getattr(doc, "affected_audience", []),
+                            image_url=getattr(doc, "image_url", None),
+                            image_search_query=getattr(doc, "image_search_query", None),
                             ingested_at=get_utc_now(),
                             entities=getattr(doc, "entities", {}),
                             language=doc.language,

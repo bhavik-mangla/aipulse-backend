@@ -18,13 +18,10 @@ from govnotify.logging_config import set_correlation_id, setup_logging
 from govnotify.exceptions import GovNotifyError, RateLimitExceeded
 
 # Route imports
-from govnotify.api.v1.admin import router as admin_router
-from govnotify.api.v1.auth import router as auth_router
 from govnotify.api.v1.categories import router as categories_router
 from govnotify.api.v1.config import router as config_router
-from govnotify.api.v1.notifications import router as notifications_router
-from govnotify.api.v1.users import router as users_router
 from govnotify.api.v1.analytics import router as analytics_router
+from govnotify.api.v1.feed import router as feed_router
 
 logger = structlog.get_logger(__name__)
 
@@ -43,8 +40,8 @@ def create_app() -> FastAPI:
     settings = get_settings()
     
     app = FastAPI(
-        title="GovNotify India",
-        description="Government notification aggregator and digest platform",
+        title="AIPulse",
+        description="General news and government notification aggregator platform",
         version="1.0.0",
         docs_url="/docs",
         redoc_url="/redoc",
@@ -60,11 +57,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    # --- Rate Limiting ---
-    if not settings.is_testing:
-        from govnotify.api.rate_limit import RateLimitMiddleware
-        app.add_middleware(RateLimitMiddleware)
 
     # --- Request-ID middleware ---
     @app.middleware("http")
@@ -90,12 +82,9 @@ def create_app() -> FastAPI:
         return {"status": "ok", "service": "govnotify"}
 
     # --- Register routers ---
-    app.include_router(auth_router, prefix="/api/v1/auth", tags=["auth"])
-    app.include_router(users_router, prefix="/api/v1/users", tags=["users"])
+    app.include_router(feed_router, prefix="/api/v1/feed", tags=["feed"])
     app.include_router(categories_router, prefix="/api/v1/categories", tags=["categories"])
     app.include_router(config_router, prefix="/api/v1/config", tags=["config"])
-    app.include_router(notifications_router, prefix="/api/v1", tags=["notifications"])
-    app.include_router(admin_router, prefix="/api/v1/admin", tags=["admin"])
     app.include_router(analytics_router, prefix="/api/v1/analytics", tags=["analytics"])
 
     # --- Static files ---

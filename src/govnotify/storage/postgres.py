@@ -83,6 +83,8 @@ class DocumentORM(Base):
     clean_text = Column(Text, nullable=True)
     summary = Column(Text, nullable=True)
     summary_hindi = Column(Text, nullable=True)
+    image_url = Column(Text, nullable=True)
+    image_search_query = Column(Text, nullable=True)
     categories = Column(JSONB, default=list)
     primary_category = Column(String(50), nullable=True, index=True)
     regions = Column(JSONB, default=list)
@@ -108,71 +110,6 @@ class DocumentORM(Base):
         Index("idx_documents_categories", "categories", postgresql_using="gin"),
         Index("idx_documents_regions", "regions", postgresql_using="gin"),
     )
-
-
-class UserORM(Base):
-    """User account table."""
-    __tablename__ = "users"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
-    email = Column(String(255), unique=True, nullable=True)
-    phone = Column(String(20), nullable=True)
-    telegram_chat_id = Column(String(50), nullable=True)
-    name = Column(String(255), nullable=True)
-    password_hash = Column(String(255), nullable=True)
-    preferences = Column(JSONB, default=dict)
-    is_active = Column(Boolean, default=True)
-    created_at = Column(
-        DateTime(timezone=True), default=get_utc_now
-    )
-    last_active_at = Column(DateTime(timezone=True), nullable=True)
-
-    # Relationships
-    digests = relationship("DigestORM", back_populates="user")
-
-
-class CategoryDigestORM(Base):
-    """Pre-generated per-category per-day digest table."""
-    __tablename__ = "category_digests"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
-    category = Column(String(50), nullable=False, index=True)
-    date = Column(String(10), nullable=False, index=True)
-    items = Column(JSONB, default=list)
-    summary_text = Column(Text, default="")
-    summary_hindi = Column(Text, default="")
-    item_count = Column(Integer, default=0)
-    has_updates = Column(Boolean, default=True)
-    generated_at = Column(
-        DateTime(timezone=True), default=get_utc_now
-    )
-    llm_model_used = Column(String(100), default="")
-    llm_cost_usd = Column(Float, default=0.0)
-
-    __table_args__ = (
-        UniqueConstraint("category", "date", name="uq_category_date"),
-    )
-
-
-class DigestORM(Base):
-    """User digest delivery record table."""
-    __tablename__ = "digests"
-
-    id = Column(UUID(as_uuid=False), primary_key=True, default=lambda: str(uuid4()))
-    user_id = Column(UUID(as_uuid=False), ForeignKey("users.id"), nullable=True)
-    category_sections = Column(JSONB, default=list)
-    delivery_channel = Column(String(50), nullable=True)
-    date = Column(String(10), nullable=False)
-    generated_at = Column(
-        DateTime(timezone=True), default=get_utc_now
-    )
-    total_items = Column(Integer, default=0)
-    delivered = Column(Boolean, default=False)
-    delivered_at = Column(DateTime(timezone=True), nullable=True)
-    error_message = Column(Text, nullable=True)
-
-    # Relationships
-    user = relationship("UserORM", back_populates="digests")
 
 
 class IngestLogORM(Base):

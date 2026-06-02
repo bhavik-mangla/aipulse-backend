@@ -114,40 +114,6 @@ class CacheError(StorageError):
     pass
 
 
-# --- Delivery ---
-
-class DeliveryError(GovNotifyError):
-    """Base for delivery channel errors."""
-
-    def __init__(
-        self,
-        channel_id: str,
-        message: str = "",
-        *,
-        permanent: bool = False,
-        cause: Exception | None = None,
-    ):
-        self.channel_id = channel_id
-        self.permanent = permanent
-        super().__init__(
-            message or f"Delivery failed on {channel_id}", cause=cause
-        )
-
-
-class EmailDeliveryError(DeliveryError):
-    """Email sending failed."""
-
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(channel_id="email", message=message, **kwargs)
-
-
-class TelegramDeliveryError(DeliveryError):
-    """Telegram message sending failed."""
-
-    def __init__(self, message: str = "", **kwargs):
-        super().__init__(channel_id="telegram", message=message, **kwargs)
-
-
 # --- Auth / API ---
 
 class AuthError(GovNotifyError):

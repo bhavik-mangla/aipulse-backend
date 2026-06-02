@@ -43,7 +43,7 @@ class NewsRSSCrawler(AbstractCrawler):
             # Fetch a few and pick an usable one
             for _ in range(5):
                 p = await proxy_manager.get_proxy()
-                if p and (p.startswith("http://") or p.startswith("socks5://") or p.startswith("socks4://")):
+                if p and (p.startswith("http://") or p.startswith("socks5://")):
                     proxy = p
                     break
             

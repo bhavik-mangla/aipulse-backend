@@ -26,7 +26,7 @@ AUDIENCES_LIST = ", ".join(AUDIENCES)
 IMPACT_TIERS_LIST = ", ".join(IMPACT_TIERS)
 
 SUMMARY_PROMPT = """
-You are a government notice summarizer for Indian citizens.
+You are an expert news and notices summarizer.
 Extract a concise, high-signal summary and metadata from the document.
 Generate both English and Hindi versions in the same response.
 
@@ -41,7 +41,9 @@ Guidelines:
 - Impact Tier: Categorize as one of: {impact_tiers}.
 - Affected Audience: Identify specific groups from the 'Valid Audiences' list above. You can select multiple.
 - Primary Category: Select the MOST relevant category from the 'Valid Categories' list above.
-- STRICTLY FACTUAL: Only include info explicitly present. Do NOT hallucinate.
+- Image Search Query: Provide an accurate 1-5 word entity or concept related to the core subject. Prefer high-signal entities (names of people, places, specific schemes) that yield official or high-quality news imagery. Avoid generic concepts that result in low-quality stock photos.
+- STRICTLY FACTUAL: Only include info explicitly present.
+- For Categories, Impact Tiers and Audience, ONLY select from the provided valid lists. Do NOT create explanations, and new values.
 
 Input text:
 {text}
@@ -59,6 +61,7 @@ Respond with ONLY valid JSON:
   "impact_tier": "Critical/High/Medium/Low",
   "affected_audience": ["Group 1", "Group 2"],
   "primary_category": "category_name",
+  "image_search_query": "relevant entity for image search",
   "action_required": "Specific action needed or 'None'"
 }}
 """
@@ -82,6 +85,7 @@ class EnrichmentResult:
         }
         self.summary: str = ""  # Will store English JSON string or full JSON
         self.summary_hindi: str = "" # Will store Hindi summary text
+        self.image_search_query: str = ""
         self.impact_tier: str = "Medium"
         self.affected_audience: list[str] = []
         self.confidence_score: float = 0.0
@@ -118,6 +122,7 @@ class Enricher:
                 # Store full JSON in summary, but also extract Hindi and metadata for dedicated fields
                 result.summary = json.dumps(summary_data)
                 result.summary_hindi = summary_data.get("quick_take_hindi", "")
+                result.image_search_query = summary_data.get("image_search_query", "")
                 result.impact_tier = summary_data.get("impact_tier", "Medium")
                 result.affected_audience = summary_data.get("affected_audience", [])
                 
@@ -166,25 +171,71 @@ class Enricher:
             content = await get_completion(
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.2,
-                max_tokens=600,
+                max_tokens=1500,
             )
             
             if not content:
                 return None
             
-            # Clean markdown JSON blocks if present
-            if content.startswith("```"):
-                content = re.sub(r"```[a-z]*\n", "", content)
-                content = re.sub(r"\n```", "", content)
-                
+            json_str = self._extract_json(content)
+            if not json_str:
+                return None
+
             # Validate JSON
-            data = json.loads(content)
+            data = json.loads(json_str)
             if "quick_take" in data and "key_details" in data:
                 return data
+            
+            logger.warning("llm_response_missing_keys", keys=list(data.keys()))
             return None
         except Exception as exc:
             logger.warning("llm_summarize_failed", error=str(exc))
             return None
+
+    def _extract_json(self, content: str) -> str | None:
+        """
+        Extract the first balanced JSON object from a string.
+        Industry standard approach: handles markdown blocks and nested structures.
+        """
+        # 1. Try markdown block first (most common LLM format)
+        markdown_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", content, re.DOTALL)
+        if markdown_match:
+            return markdown_match.group(1).strip()
+
+        # 2. Brace counting for robustness
+        content = content.strip()
+        start_idx = content.find("{")
+        if start_idx == -1:
+            return None
+
+        brace_count = 0
+        in_string = False
+        escape = False
+
+        for i in range(start_idx, len(content)):
+            char = content[i]
+
+            if escape:
+                escape = False
+                continue
+
+            if char == "\\":
+                escape = True
+                continue
+
+            if char == '"':
+                in_string = not in_string
+                continue
+
+            if not in_string:
+                if char == "{":
+                    brace_count += 1
+                elif char == "}":
+                    brace_count -= 1
+                    if brace_count == 0:
+                        return content[start_idx : i + 1]
+
+        return None
 
     def _rule_based_classify(
         self, text: str, title: str = ""

@@ -58,10 +58,12 @@ class NewsRSSSource(WebScrapeSource):
             # 3. Extract full content locally using browser impersonation
             logger.info("news_extract_content", source_id=self.source_id, url=article_url)
             
+            extracted_metadata = {}
             try:
-                content = await self._crawler.extract(article_url)
+                crawl_result = await self._crawler.extract(article_url)
                 
-                if not content or len(content) < 500:
+                if not crawl_result or not crawl_result.content or len(crawl_result.content) < 500:
+                    content = crawl_result.content if crawl_result else ""
                     logger.warning("news_extraction_low_quality", url=article_url, length=len(content) if content else 0)
                     # Fallback to RSS summary if substantial
                     rss_summary = entry.content or ""
@@ -70,12 +72,16 @@ class NewsRSSSource(WebScrapeSource):
                     else:
                         logger.warning("news_skip_article_no_content", title=title[:50])
                         continue
+                else:
+                    content = crawl_result.content
+                    extracted_metadata = crawl_result.metadata
             except Exception as exc:
                 logger.error("news_extraction_failed", url=article_url, error=str(exc))
                 continue
 
             # 4. Create and yield RawDocument
             metadata = entry.metadata.copy()
+            metadata.update(extracted_metadata) # Merge extracted metadata (including images)
             metadata["is_news"] = True
             metadata["original_url"] = article_url
             

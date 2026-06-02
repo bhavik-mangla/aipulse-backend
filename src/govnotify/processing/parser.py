@@ -28,9 +28,9 @@ class TextParser:
     """Extract and clean text (Markdown) from various content types."""
 
     # Static singleton for the PaddleOCR engine to avoid re-initialization
-    _paddle_ocr = None
-    _paddle_ocr_pid = None
-    _paddle_lock = threading.Lock()
+    # _paddle_ocr = None
+    # _paddle_ocr_pid = None
+    # _paddle_lock = threading.Lock()
 
     @classmethod
     def _get_paddle_ocr(cls):
@@ -38,52 +38,12 @@ class TextParser:
         Get or initialize the PaddleOCR engine.
         Ensures initialization happens only in the current process after fork.
         """
-        # Global kill switch
-        if os.environ.get("DISABLE_PADDLEOCR", "False").lower() == "true":
-            return None
+        return None
+        # # Global kill switch
+        # if os.environ.get("DISABLE_PADDLEOCR", "False").lower() == "true":
+        #     return None
+        # ... (rest of commented out method)
 
-        # Safety check: if we previously failed or segfaulted in this process, don't try again
-        if hasattr(cls, "_paddle_failed_pid") and cls._paddle_failed_pid == os.getpid():
-            return None
-
-        current_pid = os.getpid()
-        if cls._paddle_ocr is None or cls._paddle_ocr_pid != current_pid:
-            with cls._paddle_lock:
-                # Double check inside lock
-                if cls._paddle_ocr is None or cls._paddle_ocr_pid != current_pid:
-                    try:
-                        # Force stability flags before import/init
-                        os.environ["FLAGS_enable_pir_api"] = "0"
-                        os.environ["FLAGS_use_mkldnn"] = "0"
-                        os.environ["OMP_NUM_THREADS"] = "1"
-                        
-                        from paddleocr import PaddleOCR
-                        # Configuration matching the working CLI and verified stable in direct tests
-                        use_mkldnn = os.environ.get("PADDLE_USE_MKLDNN", "False").lower() == "true"
-                        
-                        logger.info("initializing_paddleocr_engine", pid=current_pid, mkldnn=use_mkldnn)
-                        cls._paddle_ocr = PaddleOCR(
-                            ocr_version='PP-OCRv4',
-                            use_doc_orientation_classify=False,
-                            use_doc_unwarping=False,
-                            use_textline_orientation=False,
-                            lang='en',  # Reverted to English
-                            enable_mkldnn=use_mkldnn,
-                            # --- Accuracy Optimizations for Complex Docs ---
-                            det_limit_side_len=1056,     # Increased for better accuracy on dense/complex docs
-                            det_db_thresh=0.3,
-                            det_db_box_thresh=0.6,       # Slightly higher to reduce noise in complex layouts
-                            rec_batch_num=6,
-                            use_angle_cls=True,          # Essential for scanned docs that might be tilted
-                            show_log=False
-                        )
-                        cls._paddle_ocr_pid = current_pid
-                        logger.info("paddleocr_engine_initialized", pid=current_pid)
-                    except (Exception, ImportError) as exc:
-                        logger.error("paddleocr_initialization_failed", error=str(exc))
-                        cls._paddle_failed_pid = current_pid
-                        return None
-        return cls._paddle_ocr
 
     def is_complex_pdf(self, pdf_bytes: bytes) -> bool:
         """
@@ -206,31 +166,30 @@ class TextParser:
     async def extract_pdf_from_bytes(self, pdf_bytes: bytes) -> str:
         """
         Extract high-fidelity text from PDF bytes.
-        Identifies complex docs and uses PaddleOCR for them.
         For simple digital docs, uses PyMuPDF for speed.
         Args:
             pdf_bytes: Raw PDF file bytes.
         Returns:
             Extracted text.
         """
-        is_complex = self.is_complex_pdf(pdf_bytes)
+        # is_complex = self.is_complex_pdf(pdf_bytes)
         
-        # 1. Primary for complex: PaddleOCR
-        if is_complex:
-            if os.environ.get("DISABLE_PADDLEOCR", "False").lower() == "true":
-                logger.info("paddleocr_disabled_by_env_skipping_ocr")
-            else:
-                logger.info("complex_pdf_detected_using_ocr")
-                text = await self._paddleocr_extract(pdf_bytes)
-                if text and len(text) > 100:
-                    return self._clean_text(text)
+        # # 1. Primary for complex: PaddleOCR (COMMENTED OUT FOR LIGHTWEIGHT)
+        # if is_complex:
+        #     if os.environ.get("DISABLE_PADDLEOCR", "False").lower() == "true":
+        #         logger.info("paddleocr_disabled_by_env_skipping_ocr")
+        #     else:
+        #         logger.info("complex_pdf_detected_using_ocr")
+        #         text = await self._paddleocr_extract(pdf_bytes)
+        #         if text and len(text) > 100:
+        #             return self._clean_text(text)
 
-        # 2. Fallback or primary for simple: PyMuPDF (Fast native text)
+        # 1. Primary: PyMuPDF (Fast native text)
         text = self._pymupdf_extract(pdf_bytes)
         if text and len(text) > 50:
             return self._clean_text(text)
             
-        # 3. Final Fallback: pdfplumber
+        # 2. Final Fallback: pdfplumber
         text = self._pdfplumber_extract(pdf_bytes)
         return self._clean_text(text)
 
@@ -258,77 +217,11 @@ class TextParser:
         Extract text from PDF bytes using PaddleOCR.
         Uses the classic ocr() method with stable configuration.
         """
-        import asyncio
-        import fitz
-        
-        # Check if PaddleOCR is explicitly disabled or known to be unstable in this env
-        if os.environ.get("DISABLE_PADDLEOCR", "False").lower() == "true":
-            logger.info("paddleocr_disabled_by_env_using_fallback")
-            return ""
+        return ""
+        # import asyncio
+        # import fitz
+        # ... (rest of commented out method)
 
-        ocr = self._get_paddle_ocr()
-        if not ocr:
-            return ""
-
-        tmp_path = None
-        try:
-            # Check page count and subset if necessary
-            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            total_pages = len(doc)
-            
-            if total_pages > MAX_TOTAL_PAGES:
-                logger.info("pdf_too_large_subsetting_for_ocr", total_pages=total_pages, target_pages=MAX_TOTAL_PAGES)
-                pages_to_keep = self._get_pages_to_extract(total_pages)
-                
-                new_doc = fitz.open()
-                for p in pages_to_keep:
-                    new_doc.insert_pdf(doc, from_page=p, to_page=p)
-                
-                subset_bytes = new_doc.write()
-                new_doc.close()
-                doc.close()
-                
-                # Write subset to temp file
-                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-                    tmp.write(subset_bytes)
-                    tmp_path = tmp.name
-            else:
-                doc.close()
-                # Use original bytes
-                with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
-                    tmp.write(pdf_bytes)
-                    tmp_path = tmp.name
-
-            try:
-                # The ocr() method handles PDF page iteration internally
-                # Wrap in thread to avoid blocking event loop
-                result = await asyncio.to_thread(ocr.ocr, tmp_path)
-                
-                if not result:
-                    return ""
-                
-                full_text = []
-                for item in result:
-                    # Handle paddlex OCRResult objects
-                    if hasattr(item, "get") and "rec_texts" in item:
-                        texts = item.get("rec_texts", [])
-                        if texts:
-                            full_text.append("\n".join(texts))
-                    # Handle traditional paddleocr list format: [[box, [text, score]], ...]
-                    elif isinstance(item, list):
-                        page_text = "\n".join([line[1][0] for line in item if isinstance(line, list) and len(line) > 1])
-                        if page_text:
-                            full_text.append(page_text)
-                
-                return "\n\n".join(full_text)
-            finally:
-                if tmp_path and os.path.exists(tmp_path):
-                    os.remove(tmp_path)
-        except Exception as exc:
-            logger.debug("paddleocr_extract_failed", error=str(exc))
-            if tmp_path and os.path.exists(tmp_path):
-                os.remove(tmp_path)
-            return ""
 
     def _pdfplumber_extract(self, pdf_bytes: bytes) -> str:
         """Extract text using pdfplumber."""
@@ -356,12 +249,8 @@ class TextParser:
         """Extract text using PyMuPDF (Fitz)."""
         try:
             import fitz  # PyMuPDF
-            # Set TESSDATA_PREFIX for fitz OCR if not set
-            if "TESSDATA_PREFIX" not in os.environ:
-                tess_prefix = os.environ.get("TESSDATA_PREFIX_FALLBACK", "/usr/share/tesseract-ocr/5/tessdata")
-                os.environ["TESSDATA_PREFIX"] = tess_prefix
-                logger.debug("setting_tessdata_prefix_for_fitz", path=tess_prefix)
-
+            # OCR logic removed for lightweight build
+            
             doc = fitz.open(stream=pdf_bytes, filetype="pdf")
             total_pages = len(doc)
             pages_to_extract = self._get_pages_to_extract(total_pages)
@@ -373,15 +262,8 @@ class TextParser:
             for idx in pages_to_extract:
                 page = doc[idx]
                 text = page.get_text()
-                # Fallback to OCR if page has no text but has images
-                if len(text.strip()) < 50 and page.get_images() and hasattr(page, "get_textpage_ocr"):
-                    try:
-                        # Ensure we try to use OCR
-                        tp = page.get_textpage_ocr(full=True)
-                        text = tp.extractText()
-                    except Exception as ocr_exc:
-                        logger.debug("pymupdf_ocr_page_failed", page=page.number, error=str(ocr_exc))
-
+                # Scanned page OCR fallback removed for lightweight build
+                
                 if text:
                     text_pages.append(text)
             doc.close()

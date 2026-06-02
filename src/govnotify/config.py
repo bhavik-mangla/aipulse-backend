@@ -54,20 +54,6 @@ class Settings(BaseSettings):
     embedding_device: str = "cpu"
     reranker_model: str = "BAAI/bge-reranker-v2-m3"
 
-    # --- Delivery ---
-    sendgrid_api_key: str = ""
-    sendgrid_from_email: str = "notifications@govnotify.in"
-    telegram_bot_token: str = ""
-    # Twilio (Legacy/Multi-channel)
-    twilio_account_sid: str = ""
-    twilio_auth_token: str = ""
-    whatsapp_from_number: str = ""
-    # WhatsApp Cloud API (Latest/Direct)
-    whatsapp_cloud_access_token: str = ""
-    whatsapp_cloud_phone_number_id: str = ""
-    whatsapp_cloud_business_account_id: str = ""
-    whatsapp_cloud_version: str = "v21.0"
-
     # --- Crawling ---
     crawl_user_agent: str = "GovNotify/1.0 (government notification aggregator)"
     crawl_default_rate_limit_rpm: int = 30
@@ -79,12 +65,6 @@ class Settings(BaseSettings):
     rag_chunk_size: int = 512
     rag_chunk_overlap: int = 64
     rag_similarity_threshold: float = 0.3
-
-    # --- Auth ---
-    jwt_secret_key: str = "change-me-in-production"
-    jwt_algorithm: str = "HS256"
-    jwt_access_token_expire_minutes: int = 30
-    jwt_refresh_token_expire_days: int = 7
 
     @property
     def is_production(self) -> bool:

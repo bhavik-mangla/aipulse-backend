@@ -1,8 +1,8 @@
-# 🏛️ AIPulse India
+# 🏛️ AIPulse
 
-**Empowering Indian Citizens with Deterministic Intelligence from Government and General Sources.**
+**Stay Informed with Curated General News and Official Government Sources.**
 
-AIPulse is a production-grade, extensible platform that ingests official Indian government notifications and general public interest data from dozens of sources, enriches them with AI-powered insights, and delivers personalized daily digests.
+AIPulse is a production-grade, extensible platform that ingests general public interest news and official government notifications from dozens of sources, enriches them with AI-powered insights, and provides them via a modern web interface.
 
 ---
 
@@ -45,11 +45,10 @@ AIPulse takes a **deterministic approach**:
 -   **Multi-Source Deterministic Ingestion:** RSS, OData APIs, and robust browser-mimic crawling across government and general news sources.
 -   **AI-Powered NLP Pipeline:**
     *   **Classification:** Automatic categorization (Jobs, Tax, Health, General News, etc.).
-    *   **Dual-Language Summarization:** Quick-takes in both **English & Hindi**.
-    *   **Impact Assessment:** Triage notifications by impact level (Critical/High/Medium).
--   **Smart Deduplication:** Multi-layer engine using exact hash, near-duplicate (MinHash/LSH), and semantic checks.
--   **Personalized Delivery:** Daily digests via **Email (SendGrid)** and **Telegram**, tailored to user interests.
--   **Modern Frontend:** High-performance dashboard with full search and language toggling.
+    -   **Dual-Language Summarization:** Quick-takes in both **English & Hindi**.
+        *   **Impact Assessment:** Triage notifications by impact level (Critical/High/Medium).
+    -   **Smart Deduplication:** Multi-layer engine using exact hash, near-duplicate (MinHash/LSH), and semantic checks.
+    -   **Public Feed:** High-performance dashboard with full search and language toggling.
 
 ---
 
@@ -71,8 +70,7 @@ graph TD
     Sources[Gov Portals / General APIs] -->|Ingest| Crawler[Crawl4AI / API Client]
     Crawler -->|Raw Doc| Pipeline[NLP Pipeline]
     Pipeline -->|Summary / Embedding| DB[(PostgreSQL + Qdrant)]
-    DB -->|Assembly| Digest[Digest Assembler]
-    Digest -->|Deliver| Channels[Email / Telegram / Web]
+    DB -->|API| Web[Web / Mobile App]
 ```
 
 ---
@@ -113,4 +111,4 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 Contributions are welcome! Whether it's adding a new source or improving the NLP pipeline, feel free to open a PR.
 
-*Built with ❤️ for a more informed India.*
+*Built with ❤️ for a more informed society.*

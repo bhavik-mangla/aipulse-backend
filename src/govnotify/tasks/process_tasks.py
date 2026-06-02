@@ -77,7 +77,7 @@ async def _process_document_async(task, document_id: str):
             )
             raw_doc.compute_content_hash()
 
-            pipeline = ProcessingPipeline(skip_embeddings=True)
+            pipeline = ProcessingPipeline()
             result = await pipeline.process(raw_doc)
 
             if result.error:

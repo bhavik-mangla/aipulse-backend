@@ -96,27 +96,6 @@ CATEGORY_EMOJIS = {
     "other": "🔗",
 }
 
-# Category Descriptions
-CATEGORY_DESCRIPTIONS = {
-    "jobs": "Government job notifications, UPSC, SSC, state PSC recruitment",
-    "schemes": "Government schemes, subsidies, yojanas for citizens",
-    "tax": "Tax policy changes, GST updates, Income Tax notifications",
-    "agriculture": "Agricultural policy, MSP, crop insurance, farming subsidies",
-    "education": "Education policy, scholarships, university notices, exam schedules",
-    "health": "Health advisories, insurance, AYUSH, medical regulations",
-    "legal": "Court orders, legal amendments, regulatory changes",
-    "gazette": "Official Gazette publications, ordinances, statutory rules",
-    "finance": "Banking regulations, RBI circulars, financial market updates",
-    "infrastructure": "Roads, railways, smart cities, housing schemes",
-    "environment": "Environmental clearances, pollution control, climate policy",
-    "defense": "Defence procurement, military recruitment, veteran affairs",
-    "local_governance": "Municipal, panchayat, and state-level governance notices",
-    "technology": "IT policy, digital India initiatives, cybersecurity directives",
-    "women_child": "Women and child development schemes, ICDS, maternity benefits",
-    "social_welfare": "Other government notifications and circulars",
-    "other": "Other government notifications and circulars",
-}
-
 # Human-readable names for sources
 SOURCE_NAMES = {
     "et_top_stories": "Economic Times",
@@ -140,37 +119,6 @@ def get_source_name(source_id: str) -> str:
     """Get human-readable name for a source ID."""
     return SOURCE_NAMES.get(source_id, source_id.replace("_", " ").title())
 
-# I18N Strings for UI/Emails
-I18N = {
-    "en": {
-        "digest_title": "GovNotify Daily Digest",
-        "digest_header": "GovNotify News Flash",
-        "updates": "updates",
-        "update": "update",
-        "no_updates": "No new government updates today. We'll keep watching!",
-        "no_updates_portal": "No updates today.",
-        "source": "Source",
-        "view_official": "View Official Source",
-        "unsubscribe_msg": "You're receiving this because you subscribed to GovNotify.",
-        "manage_prefs": "Manage Preferences",
-        "unsubscribe": "Unsubscribe",
-        "hq_address": "GovNotify HQ, Sector 44, Gurgaon, Haryana, India",
-    },
-    "hi": {
-        "digest_title": "GovNotify दैनिक समाचार सारांश",
-        "digest_header": "GovNotify न्यूज़ फ़्लैश",
-        "updates": "अपडेट",
-        "update": "अपडेट",
-        "no_updates": "आज कोई नया सरकारी अपडेट नहीं है। हम नज़र बनाए रखेंगे!",
-        "no_updates_portal": "आज कोई अपडेट नहीं है।",
-        "source": "स्रोत",
-        "view_official": "आधिकारिक स्रोत देखें",
-        "unsubscribe_msg": "आपको यह प्राप्त हो रहा है क्योंकि आपने GovNotify की सदस्यता ली है।",
-        "manage_prefs": "प्राथमिकताएं प्रबंधित करें",
-        "unsubscribe": "सदस्यता समाप्त करें",
-        "hq_address": "GovNotify मुख्यालय, सेक्टर 44, गुड़गांव, हरियाणा, भारत",
-    }
-}
 
 # A collection of modern browser user-agents for rotation
 USER_AGENTS = [

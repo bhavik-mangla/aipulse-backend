@@ -1,10 +1,7 @@
 """
 Maintenance tasks - cleanup, health checks, data retention.
-Per §24.5:
-- Documents retained 30 days
-- Category digests retained 30 days
-- User digests retained 30 days
-- Ingest logs retained 30 days
+- Documents retained per config
+- Ingest logs retained per config
 
 Scheduled:
 - run_maintenance: daily at 2:00 AM IST (20:30 UTC)
@@ -14,7 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import structlog
 from govnotify.utils.time import get_utc_now
@@ -22,8 +19,6 @@ from sqlalchemy import delete
 
 from govnotify.tasks.celery_app import app
 from govnotify.storage.postgres import (
-    CategoryDigestORM,
-    DigestORM,
     DocumentORM,
     IngestLogORM,
     get_engine,
@@ -32,7 +27,7 @@ from govnotify.storage.postgres import (
 
 logger = structlog.get_logger(__name__)
 
-# Data retention period (§24.5)
+# Data retention period
 RETENTION_DAYS = 120
 
 
@@ -57,7 +52,7 @@ def _run_async(coro):
 )
 def run_maintenance(self):
     """
-    Daily maintenance: purge expired data per §24.5 retention policy.
+    Daily maintenance: purge expired data.
     Runs at 20:30 UTC (2:00 AM IST).
     """
     return _run_async(_run_maintenance_async(self))
@@ -69,12 +64,9 @@ async def _run_maintenance_async(task):
     session_factory = get_session_factory(engine)
     
     cutoff = get_utc_now() - timedelta(days=RETENTION_DAYS)
-    cutoff_date_str = cutoff.strftime("%Y-%m-%d")
 
     results = {
         "documents_deleted": 0,
-        "category_digests_deleted": 0,
-        "user_digests_deleted": 0,
         "ingest_logs_deleted": 0,
     }
 
@@ -85,17 +77,7 @@ async def _run_maintenance_async(task):
             result = await session.execute(stmt)
             results["documents_deleted"] = result.rowcount
 
-            # 2. Purge old category digests
-            stmt = delete(CategoryDigestORM).where(CategoryDigestORM.date < cutoff_date_str)
-            result = await session.execute(stmt)
-            results["category_digests_deleted"] = result.rowcount
-
-            # 3. Purge old user digests
-            stmt = delete(DigestORM).where(DigestORM.date < cutoff_date_str)
-            result = await session.execute(stmt)
-            results["user_digests_deleted"] = result.rowcount
-
-            # 4. Purge old ingest logs
+            # 2. Purge old ingest logs
             stmt = delete(IngestLogORM).where(IngestLogORM.started_at < cutoff)
             result = await session.execute(stmt)
             results["ingest_logs_deleted"] = result.rowcount

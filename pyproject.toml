@@ -1,7 +1,7 @@
 [project]
 name = "govnotify"
 version = "0.1.0"
-description = "Indian Government Notification Platform"
+description = "General News and Government Notification Platform"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -21,20 +21,19 @@ dependencies = [
     "litellm>=1.80.0,<1.81.0",
     "PyJWT[crypto]>=2.10.0",
     "bcrypt>=4.3.0",
-    "qdrant-client>=1.17.1",
-    "fastembed>=0.8.0",
+    # "qdrant-client>=1.17.1",
+    # "fastembed>=0.8.0",
     "datasketch>=1.9.0",
     "pdfplumber>=0.11.9",
     "pymupdf>=1.24.9,<1.25.0",
     "trafilatura>=2.0.0",
     "beautifulsoup4>=4.14.3",
     "lingua-language-detector>=2.2.0",
-    "python-telegram-bot>=22.7",
     "croniter>=6.2.2",
-    "paddleocr>=2.7.3",
-    "paddlepaddle>=2.6.2",
-    "numpy<2.0.0",
-    "layoutparser[layoutmodels,tesseract]>=0.3.4",
+    # "paddleocr>=2.7.3",
+    # "paddlepaddle>=2.6.2",
+    # "numpy<2.0.0",
+    # "layoutparser[layoutmodels,tesseract]>=0.3.4",
 ]
 
 [build-system]

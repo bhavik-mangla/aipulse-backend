@@ -2,7 +2,6 @@
 Redis cache and queue operations.
 Manages connections and key patterns for:
 - Content hash dedup cache
-- Pre-generated category digest cache
 - Rate limiting
 - Task locks
 """
@@ -19,19 +18,14 @@ logger = structlog.get_logger(__name__)
 _redis_client: autoredis.Redis | None = None
 
 # --- Key Patterns ---
-# These match §9.3 of the system prompt exactly.
 
 DEDUP_HASH_KEY = "dedup:hash:{content_hash}"  # TTL: 120 days
-DIGEST_CATEGORY_KEY = "digest:category:{category}:{date}"  # TTL: 48h
-DIGEST_ALL_KEY = "digest:all_categories:{date}"  # TTL: 48h
 CACHE_CATEGORY_LATEST = "cache:category:{category}:latest"  # TTL: 24h
 RATELIMIT_USER_KEY = "ratelimit:user:{user_id}"
 LOCK_SOURCE_KEY = "lock:source:{source_id}"
-LOCK_DIGEST_KEY = "lock:digest_generation:{date}"
 
 # TTLs in seconds
 TTL_DEDUP = 120 * 24 * 3600  # 120 days
-TTL_DIGEST = 48 * 3600  # 48 hours
 TTL_CACHE_LATEST = 24 * 3600  # 24 hours
 TTL_LOCK = 30 * 60  # 30 minutes (task lock)
 
@@ -73,21 +67,7 @@ class RedisStore:
         key = DEDUP_HASH_KEY.format(content_hash=content_hash)
         return await self.client.get(key)
 
-    # --- Category Digest Cache ---
-
-    async def set_category_digest(
-        self, category: str, date: str, digest_json: str
-    ) -> None:
-        """Cache a pre-generated category digest."""
-        key = DIGEST_CATEGORY_KEY.format(category=category, date=date)
-        await self.client.set(key, digest_json, ex=TTL_DIGEST)
-
-    async def get_category_digest(self, category: str, date: str) -> str | None:
-        """Retrieve a cached category digest."""
-        key = DIGEST_CATEGORY_KEY.format(category=category, date=date)
-        return await self.client.get(key)
-
-    # --- Task Locks ---
+    # --- Source Health / Rate Limiting ---
 
     async def acquire_lock(self, lock_key: str, worker_id: str) -> bool:
         """Acquire a distributed lock. Returns True if acquired."""

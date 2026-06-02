@@ -13,7 +13,6 @@ from govnotify.constants import (
     IMPACT_TIERS,
     NoticeCategory,
     CATEGORY_NAMES_HI,
-    CATEGORY_DESCRIPTIONS,
 )
 
 logger = structlog.get_logger(__name__)
@@ -24,7 +23,6 @@ class CategoryMetadata(BaseModel):
     id: str
     en: str
     hi: str
-    description: str
 
 
 class MetadataResponse(BaseModel):
@@ -41,7 +39,6 @@ async def get_metadata():
             id=cat.value,
             en=cat.value.replace("_", " ").title(),
             hi=CATEGORY_NAMES_HI.get(cat.value, cat.value),
-            description=CATEGORY_DESCRIPTIONS.get(cat.value, "")
         )
         for cat in NoticeCategory
     ]

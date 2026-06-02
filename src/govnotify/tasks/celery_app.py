@@ -58,16 +58,6 @@ app.conf.beat_schedule = {
         "task": "govnotify.tasks.ingest_tasks.ingest_all_sources",
         "schedule": crontab(minute=0), # Hourly check
     },
-    # Pre-generate category digests (collect pre-gen summaries) - 6:30 AM IST = 1:00 AM UTC
-    "generate-category-digests": {
-        "task": "govnotify.tasks.digest_tasks.generate_all_category_digests",
-        "schedule": crontab(hour=1, minute=0),
-    },
-    # Assemble and send user digests - 7:00 AM IST = 1:30 AM UTC
-    "send-user-digests": {
-        "task": "govnotify.tasks.digest_tasks.assemble_and_send_user_digests",
-        "schedule": crontab(hour=1, minute=30),
-    },
     # Maintenance - 2:00 AM IST = 20:30 UTC (previous day)
     "maintenance": {
         "task": "govnotify.tasks.maintenance_tasks.run_maintenance",
@@ -80,7 +70,6 @@ app.conf.beat_schedule = {
 app.autodiscover_tasks(
     [
         "govnotify.tasks.ingest_tasks",
-        "govnotify.tasks.digest_tasks",
         "govnotify.tasks.process_tasks",
         "govnotify.tasks.maintenance_tasks",
     ]

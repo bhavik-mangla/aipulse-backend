@@ -12,12 +12,11 @@ from datetime import datetime
 import structlog
 
 from govnotify.config import get_settings
-from govnotify.models.document import DocumentChunk, ProcessedDocument
+from govnotify.models.document import ProcessedDocument
 from govnotify.models.source import RawDocument
-from govnotify.processing.chunker import Chunker
 from govnotify.processing.dedup import DeduplicationEngine
-from govnotify.processing.embedder import Embedder
 from govnotify.processing.enricher import Enricher
+from govnotify.processing.image_resolver import ImageResolver
 from govnotify.processing.parser import TextParser
 
 logger = structlog.get_logger(__name__)
@@ -27,7 +26,6 @@ class PipelineResult:
     """Result of processing a single document through the pipeline."""
 
     def __init__(self) -> None:
-        self.chunks: list[DocumentChunk] = []
         self.document: ProcessedDocument | None = None
         self.is_duplicate: bool = False
         self.skipped: bool = False
@@ -44,7 +42,6 @@ class ProcessingPipeline:
         result = await pipeline.process(raw_doc)
         if not result.skipped and not result.error:
             # result.document is the ProcessedDocument
-            # result.chunks are the embedded DocumentChunks
             await store(result)
     """
 
@@ -53,18 +50,14 @@ class ProcessingPipeline:
         dedup: DeduplicationEngine | None = None,
         parser: TextParser | None = None,
         enricher: Enricher | None = None,
-        chunker: Chunker | None = None,
-        embedder: Embedder | None = None,
-        skip_embeddings: bool = False,
+        image_resolver: ImageResolver | None = None,
         enable_llm: bool | None = None,
     ) -> None:
         settings = get_settings()
         self.dedup = dedup or DeduplicationEngine()
         self.parser = parser or TextParser()
         self.enricher = enricher or Enricher()
-        self.chunker = chunker or Chunker()
-        self.embedder = embedder or Embedder()
-        self.skip_embeddings = skip_embeddings
+        self.image_resolver = image_resolver or ImageResolver()
         self.enable_llm = enable_llm if enable_llm is not None else settings.enable_llm
 
     async def check_duplicate(self, doc: RawDocument, session=None) -> tuple[bool, str | None]:
@@ -81,14 +74,13 @@ class ProcessingPipeline:
         1. Dedup check (exact hash + MinHash)
         2. Parse / extract text
         3. Enrich (classify, NER, summarize)
-        4. Chunk
-        5. Embed
-        6. Build ProcessedDocument
+        4. Resolve Image
+        5. Build ProcessedDocument
         Args:
             raw_doc: Raw document from a source.
             session: Optional AsyncSession for DB dedup.
         Returns:
-            PipelineResult with the processed document and chunks.
+            PipelineResult with the processed document.
         """
         result = PipelineResult()
         try:
@@ -138,24 +130,12 @@ class ProcessingPipeline:
             # Generate document ID
             doc_id = str(uuid.uuid4())
 
-            # Step 4: Chunk
-            chunks = self.chunker.chunk_document(
-                document_id=doc_id,
-                text=clean_text,
-                summary_context=enrichment.summary,
-                categories=[c.value for c in enrichment.categories],
-                regions=enrichment.regions,
-                departments=[enrichment.department] if enrichment.department else [],
-                source_id=raw_doc.source_id,
-                ingested_at=raw_doc.fetched_at,
-                language=language,
+            # Step 4: Resolve Image
+            image_url = await self.image_resolver.resolve_image(
+                raw_doc, enrichment.image_search_query
             )
 
-            # Step 5: Embed (optional - can be skipped for testing)
-            if not self.skip_embeddings and chunks:
-                chunks = await self.embedder.embed_chunks(chunks)
-
-            # Step 6: Build ProcessedDocument
+            # Step 5: Build ProcessedDocument
             processed = ProcessedDocument(
                 id=doc_id,
                 source_id=raw_doc.source_id,
@@ -166,6 +146,8 @@ class ProcessingPipeline:
                 clean_text=clean_text,
                 summary=enrichment.summary,
                 summary_hindi=enrichment.summary_hindi,
+                image_url=image_url,
+                image_search_query=enrichment.image_search_query,
                 categories=enrichment.categories,
                 regions=enrichment.regions,
                 primary_category=enrichment.primary_category,
@@ -186,7 +168,6 @@ class ProcessingPipeline:
             self.dedup.register_minhash(doc_id, raw_doc.raw_content)
 
             result.document = processed
-            result.chunks = chunks
 
             logger.info(
                 "pipeline_complete",
@@ -195,8 +176,8 @@ class ProcessingPipeline:
                 source_id=raw_doc.source_id,
                 confidence=enrichment.confidence_score,
                 categories=[c.value for c in enrichment.categories],
-                num_chunks=len(chunks),
             )
+
 
         except Exception as exc:
             result.error = str(exc)

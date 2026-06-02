@@ -144,23 +144,6 @@
         background: var(--border);
       }
 
-      .btn-subscribe {
-        background: var(--primary);
-        color: #fff;
-        padding: 8px 16px;
-        border-radius: 10px;
-        border: none;
-        font-weight: 800;
-        font-size: 0.8rem;
-        cursor: pointer;
-        transition: var(--transition);
-        white-space: nowrap;
-      }
-      .btn-subscribe:hover {
-        transform: scale(1.02);
-        opacity: 0.9;
-      }
-
       .hero {
         text-align: center;
         padding: 60px 0 40px 0;
@@ -184,25 +167,10 @@
       .feed-header {
         margin-bottom: 32px;
       }
-      .feed-header-top {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-      }
       .feed-header h2 {
         margin: 0;
         font-size: 1.4rem;
         font-weight: 800;
-      }
-
-      .badge-count {
-        background: var(--primary);
-        color: #fff;
-        padding: 5px 12px;
-        border-radius: 20px;
-        font-size: 0.65rem;
-        font-weight: 700;
       }
 
       .feed-filters {
@@ -233,9 +201,6 @@
         inset: 0;
         width: 100%;
         height: 100%;
-      }
-      [data-theme="light"] .filter-date::-webkit-calendar-picker-indicator {
-        opacity: 0;
       }
       [data-theme="light"] .filter-date {
         color-scheme: light;
@@ -410,22 +375,6 @@
         color: var(--primary);
       }
 
-      .btn-action {
-        width: 100%;
-        padding: 14px;
-        border-radius: 12px;
-        border: none;
-        background: var(--primary);
-        color: #fff;
-        font-weight: 800;
-        font-size: 1rem;
-        cursor: pointer;
-        transition: var(--transition);
-      }
-      .btn-action:hover {
-        opacity: 0.9;
-      }
-
       #toast {
         position: fixed;
         bottom: 20px;
@@ -554,10 +503,6 @@
         font-weight: 800;
       }
 
-      .modal-subscribe {
-        max-width: 420px;
-      }
-
       @media (max-width: 768px) {
         .container {
           padding: 0 16px;
@@ -587,10 +532,6 @@
         }
         .logo {
           font-size: 1.1rem;
-        }
-        .btn-subscribe {
-          padding: 6px 12px;
-          font-size: 0.75rem;
         }
         .feed-filters {
           gap: 8px;
@@ -642,10 +583,6 @@
           min-width: 38px;
           height: 38px;
         }
-        .btn-subscribe {
-          padding: 6px 10px;
-          font-size: 0.65rem;
-        }
         .logo {
           font-size: 1rem;
           gap: 4px;
@@ -693,13 +630,6 @@
             हिन्दी
           </button>
           <button onclick="toggleTheme()" class="btn-icon">🌓</button>
-          <button
-            onclick="showSubscribeModal()"
-            class="btn-subscribe"
-            id="nav-sub-btn"
-          >
-            Get Email Alerts
-          </button>
         </div>
       </div>
     </nav>
@@ -759,170 +689,16 @@
     <footer class="container" style="margin: 80px auto 40px; padding-top: 32px; border-top: 1px solid var(--border); opacity: 0.6;">
       <div style="font-size: 0.7rem; color: var(--text-muted); line-height: 1.8; max-width: 1100px;">
         <p style="margin-bottom: 12px; font-weight: bold; color: var(--primary);">
-          Note: Since we are in beta, please check your Spam/Junk folder for daily digests and mark them as "Not Spam" to ensure delivery.
+          Note: Since we are in beta, please report any bugs to the team.
         </p>
         <p style="margin: 0;">
-          <strong>Disclaimer:</strong> AI Pulse is an independent, non-profit initiative for citizen awareness and is NOT affiliated with, endorsed by, or an official representative of any government entity. Information is aggregated daily via automated scraping from public domains and provided "as is" for informational purposes only. Do not make decisions based solely on AI-generated content—always verify with the official source. Released under MIT License.
+          <strong>Disclaimer:</strong> AI Pulse is an independent, non-profit initiative for general news and government intelligence awareness and is NOT affiliated with, endorsed by, or an official representative of any government entity. Information is aggregated daily via automated scraping from public domains and provided "as is" for informational purposes only. Do not make decisions based solely on AI-generated content—always verify with the official source. Released under MIT License.
         </p>
         <p style="margin-top: 12px;">
           <strong>Contact:</strong> <a href="mailto:bhavikmangla1234@gmail.com" style="color: var(--primary); text-decoration: none; font-weight: bold;">bhavikmangla1234@gmail.com</a>
         </p>
       </div>
     </footer>
-
-    <!-- Modals -->
-    <div id="subscribe-overlay" class="modal-overlay">
-      <div class="modal-content modal-subscribe">
-        <h2
-          id="modal-sub-title"
-          style="
-            margin-top: 0;
-            text-align: center;
-            font-size: 1.5rem;
-            font-weight: 800;
-          "
-        >
-          Daily Alerts
-        </h2>
-        <div
-          style="
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-            margin-top: 24px;
-          "
-        >
-          <div
-            class="input-box"
-            style="
-              background: var(--bg);
-              border: 1px solid var(--border);
-              border-radius: 12px;
-              padding: 12px 16px;
-              display: flex;
-              width: 100%;
-            "
-          >
-            <input
-              type="text"
-              id="sub-id"
-              placeholder="Email Address"
-              style="
-                background: transparent;
-                border: none;
-                color: var(--text);
-                font-size: 1rem;
-                width: 100%;
-                outline: none;
-              "
-            />
-          </div>
-
-          <div
-            id="sub-details"
-            style="display: none; flex-direction: column; gap: 20px"
-          >
-            <div>
-              <p
-                id="preferred-lang-text"
-                style="
-                  font-size: 0.75rem;
-                  font-weight: 800;
-                  color: var(--text-muted);
-                  margin: 0 0 12px 0;
-                  text-transform: uppercase;
-                  letter-spacing: 0.05em;
-                "
-              >
-                Preferred Language
-              </p>
-              <select 
-                id="sub-lang"
-                style="
-                  width: 100%;
-                  background: var(--bg);
-                  border: 1px solid var(--border);
-                  color: var(--text);
-                  border-radius: 12px;
-                  padding: 10px 14px;
-                  font-family: inherit;
-                  font-weight: 700;
-                  font-size: 0.9rem;
-                  outline: none;
-                "
-              >
-                <option value="en">English</option>
-                <option value="hi">हिन्दी</option>
-              </select>
-            </div>
-
-            <div>
-              <p
-                id="portal-follow-text"
-                style="
-                  font-size: 0.75rem;
-                  font-weight: 800;
-                  color: var(--text-muted);
-                  margin: 0 0 12px 0;
-                  text-transform: uppercase;
-                  letter-spacing: 0.05em;
-                "
-              >
-                Personalization
-              </p>
-              
-              <div style="margin-bottom: 20px; display: flex; flex-direction: column; gap: 16px;">
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
-                  <input type="checkbox" id="sub-high-impact" style="width: 18px; height: 18px; accent-color: var(--primary);">
-                  <span>Only High Impact alerts 🚨</span>
-                </label>
-
-                <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 0.9rem; font-weight: 600;">
-                  <input type="checkbox" id="sub-general-news" style="width: 18px; height: 18px; accent-color: var(--primary);">
-                  <span>Include General news 🗞️</span>
-                </label>
-                
-                <div>
-                  <p style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase;">Who are you? (Select multiple)</p>
-                  <div id="audience-grid" style="display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg);">
-                    <!-- Audience chips injected by JS -->
-                  </div>
-                </div>
-
-                <div>
-                   <p style="font-size: 0.7rem; font-weight: 800; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase;">Portals to Follow</p>
-                   <div id="src-grid" style="display: flex; flex-wrap: wrap; gap: 6px; max-height: 150px; overflow-y: auto; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg);">
-                    <!-- Portal chips injected by JS -->
-                   </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <button
-            class="btn-action"
-            onclick="handleSubscribeFlow()"
-            id="btn-sub-flow"
-            style="height: 54px"
-          >
-            Continue
-          </button>
-          <button
-            onclick="hideSubscribeModal()"
-            id="btn-sub-cancel"
-            style="
-              background: transparent;
-              border: none;
-              color: var(--text-muted);
-              font-weight: 700;
-              cursor: pointer;
-            "
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    </div>
 
     <div id="content-overlay" class="modal-overlay">
       <div class="modal-content">
@@ -958,6 +734,23 @@
 
     <script>
       const API = "/api/v1";
+      
+      const LOGO_EXT = {
+        egazette_central: "svg", 
+        et_top_stories: "png", 
+        ibbi_updates: "png",
+        income_tax: "png", 
+        irdai_updates: "webp", 
+        mca_updates: "png",
+        meity_updates: "svg", 
+        mha_updates: "svg", 
+        mint_top_stories: "png",
+        pib_press_releases: "jpg", 
+        rbi_circulars: "png", 
+        rbi_press_releases: "png",
+        sebi_news: "jpg", 
+        bs_top_stories: "png"
+      };
       let page = 1;
       let currentLang = localStorage.getItem("gov_lang") || "en";
       let isHighImpactOnly = false;
@@ -991,36 +784,20 @@
       let ALL_SOURCES = [];
       let feedType = "news";
 
-      // Global filter to hide old/inconsistent data from before official launch
-      const HIDE_BEFORE_DATE = new Date("2026-05-02T00:00:00Z");
-
       const I18N = {
         en: {
           heroTitle: "Real-time news & policy pulse.",
-          feedTitle: "Latest Intel",
           allPortals: "All Portals",
           allCats: "All Categories",
           whoAreYou: "Who are you?",
           highImpactOnly: "High Impact Only",
           searchPlaceholder: "Search keywords...",
-          getEmailAlerts: "Get Email Alerts",
-          dailyAlerts: "Daily Alerts",
-          preferredLanguage: "Preferred Language",
-          portalsToFollow: "Portals to Follow",
-          continue: "Continue",
-          getAlerts: "Get Alerts",
-          cancel: "Cancel",
-          close: "CLOSE [ESC]",
-          records: "Records",
           loading: "Loading...",
           noRecords: "No records found.",
           errorLoading: "Error loading feed.",
           errorContent: "Error loading content.",
           quickTake: "QUICK TAKE",
           noSummary: "Summary not available for this record.",
-          validEmail: "Enter a valid email",
-          selectPortal: "Select at least one portal",
-          subSuccess: "Subscription success updated or created",
           news: "General",
           official: "Official",
           heroTitleGeneral: "High-signal news, simplified.",
@@ -1028,30 +805,17 @@
         },
         hi: {
           heroTitle: "वास्तविक समय समाचार और नीति पल्स।",
-          feedTitle: "नवीनतम जानकारी",
           allPortals: "सभी पोर्टल",
           allCats: "सभी श्रेणियां",
           whoAreYou: "आप कौन हैं?",
           highImpactOnly: "केवल उच्च प्रभाव",
           searchPlaceholder: "कीवर्ड खोजें...",
-          getEmailAlerts: "ईमेल अलर्ट प्राप्त करें",
-          dailyAlerts: "दैनिक अलर्ट",
-          preferredLanguage: "पसंदीदा भाषा",
-          portalsToFollow: "फॉलो करने के लिए पोर्टल",
-          continue: "आगे बढ़ें",
-          getAlerts: "अलर्ट प्राप्त करें",
-          cancel: "रद्द करें",
-          close: "बंद करें [ESC]",
-          records: "रिकॉर्ड",
           loading: "लोड हो रहा है...",
           noRecords: "कोई रिकॉर्ड नहीं मिला।",
           errorLoading: "फ़ीड लोड करने में त्रुटि।",
           errorContent: "सामग्री लोड करने में त्रुटि।",
           quickTake: "त्वरित सारांश",
           noSummary: "इस रिकॉर्ड के लिए सारांश उपलब्ध नहीं है।",
-          validEmail: "एक मान्य ईमेल दर्ज करें",
-          selectPortal: "कम से कम एक पोर्टल चुनें",
-          subSuccess: "सदस्यता सफलतापूर्वक अपडेट या बनाई गई",
           news: "सामान्य",
           official: "आधिकारिक",
           heroTitleGeneral: "महत्वपूर्ण समाचार, सरल भाषा में।",
@@ -1079,17 +843,13 @@
         trackVisit();
         updateDate();
         setTheme(localStorage.getItem("gov_theme") || "light");
-        // Initial setup with fallbacks
         setLang(currentLang);
         
-        // Fetch feed immediately to show skeletons and get data
         fetchFeed();
 
-        // Try to fetch fresh metadata and sources
         try {
           await fetchMetadata();
           await fetchSources();
-          // Re-set language to refresh dropdowns with potentially new data
           setLang(currentLang);
         } catch (e) {
           console.warn("API initialization partially failed, using fallbacks", e);
@@ -1099,22 +859,16 @@
           if (e.key === "Enter") resetAndFetch();
         });
 
-        // Close on ESC
         document.addEventListener("keydown", (e) => {
           if (e.key === "Escape") {
             hideContent();
-            hideSubscribeModal();
           }
         });
 
-        // Close on Click Outside
-        [document.getElementById("subscribe-overlay"), document.getElementById("content-overlay")].forEach(overlay => {
-          overlay.addEventListener("click", (e) => {
-            if (e.target === overlay) {
-              hideContent();
-              hideSubscribeModal();
-            }
-          });
+        document.getElementById("content-overlay").addEventListener("click", (e) => {
+          if (e.target === document.getElementById("content-overlay")) {
+            hideContent();
+          }
         });
       }
 
@@ -1138,13 +892,6 @@
           heroTitle.textContent = feedType === "news" ? t.heroTitleGeneral : t.heroTitleOfficial;
         }
 
-        const optCats = document.getElementById("opt-all-cats");
-        if (optCats) optCats.textContent = t.allCats;
-        
-        const optWho = document.getElementById("opt-who-are-you");
-        if (optWho) optWho.textContent = t.whoAreYou;
-
-        // Populate/Refresh dropdowns
         const selCat = document.getElementById("sel-cat");
         if (selCat) {
             const currentVal = selCat.value;
@@ -1174,29 +921,6 @@
         const searchQ = document.getElementById("search-q");
         if (searchQ) searchQ.placeholder = t.searchPlaceholder;
         
-        const navSubBtn = document.getElementById("nav-sub-btn");
-        if (navSubBtn) navSubBtn.textContent = t.getEmailAlerts;
-        
-        const modalSubTitle = document.getElementById("modal-sub-title");
-        if (modalSubTitle) modalSubTitle.textContent = t.dailyAlerts;
-        
-        const prefLangText = document.getElementById("preferred-lang-text");
-        if (prefLangText) prefLangText.textContent = t.preferredLanguage;
-        
-        const portalFollowText = document.getElementById("portal-follow-text");
-        if (portalFollowText) portalFollowText.textContent = t.portalsToFollow;
-        
-        const btnSubFlow = document.getElementById("btn-sub-flow");
-        if (btnSubFlow) {
-          btnSubFlow.textContent = document.getElementById("sub-details").style.display === "none" ? t.continue : t.getAlerts;
-        }
-        
-        const btnSubCancel = document.getElementById("btn-sub-cancel");
-        if (btnSubCancel) btnSubCancel.textContent = t.cancel;
-        
-        const subLang = document.getElementById("sub-lang");
-        if (subLang) subLang.value = l;
-        
         renderSourceFilters();
         updateButtonText();
       }
@@ -1219,7 +943,6 @@
       }
 
       function updateButtonText() {
-        // Update toggle button text based on language
         const btnNews = document.getElementById("btn-type-news");
         const btnOfficial = document.getElementById("btn-type-official");
         if (btnNews) btnNews.textContent = I18N[currentLang].news;
@@ -1232,66 +955,6 @@
           resetAndFetch();
       }
 
-      function showSubscribeModal() {
-        document.getElementById("subscribe-overlay").style.display = "flex";
-      }
-
-      function hideSubscribeModal() {
-        document.getElementById("subscribe-overlay").style.display = "none";
-        document.getElementById("sub-details").style.display = "none";
-        const btnSubFlow = document.getElementById("btn-sub-flow");
-        if (btnSubFlow) btnSubFlow.textContent = I18N[currentLang].continue;
-        document.getElementById("sub-id").value = "";
-      }
-
-      async function handleSubscribeFlow() {
-        const email = document.getElementById("sub-id").value;
-        const t = I18N[currentLang];
-        if (!email.includes("@")) return toast(t.validEmail, "error");
-
-        if (document.getElementById("sub-details").style.display === "none") {
-          document.getElementById("sub-details").style.display = "flex";
-          document.getElementById("btn-sub-flow").textContent = t.getAlerts;
-          return;
-        }
-
-        const srcs = Array.from(document.querySelectorAll(".src-chip-input:checked")).map((s) => s.value);
-        if (srcs.length === 0) return toast(t.selectPortal, "error");
-        
-        const audiences = Array.from(document.querySelectorAll(".aud-chip-input:checked")).map((a) => a.value);
-        const subLang = document.getElementById("sub-lang").value;
-        const highImpactOnly = document.getElementById("sub-high-impact").checked;
-        const includeGeneralNews = document.getElementById("sub-general-news").checked;
-
-        try {
-          const res = await fetch(`${API}/auth/access`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              email: email,
-              language: subLang,
-              sources: srcs,
-              profile_description: audiences.join(", "),
-              preferences: {
-                delivery_channels: ["email"],
-                high_impact_only: highImpactOnly,
-                include_general_news: includeGeneralNews,
-                audiences: audiences
-              },
-            }),
-          });
-          if (res.ok) {
-            toast(t.subSuccess, "success");
-            setTimeout(() => { hideSubscribeModal(); }, 1500);
-          } else {
-            const err = await res.json();
-            toast(err.detail || "Subscription failed", "error");
-          }
-        } catch (e) {
-          toast("Network error", "error");
-        }
-      }
-
       async function fetchMetadata() {
         try {
           const res = await fetch(`${API}/config/metadata`);
@@ -1300,17 +963,6 @@
           if (data.audiences && data.audiences.length > 0) AUDIENCES = data.audiences;
           if (data.categories && data.categories.length > 0) CATEGORIES = data.categories;
           if (data.impact_tiers && data.impact_tiers.length > 0) IMPACT_TIERS = data.impact_tiers;
-
-          // Populate Audience Grid in Modal (other dropdowns handled by setLang)
-          const audGrid = document.getElementById("audience-grid");
-          if (audGrid) {
-            audGrid.innerHTML = "";
-            AUDIENCES.forEach((a, idx) => {
-              const chip = document.createElement("div");
-              chip.innerHTML = `<input type="checkbox" id="a-${idx}" class="aud-chip-input" value="${a}" style="display:none;"><label for="a-${idx}" style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:0.7rem; font-weight:700; cursor:pointer;" onclick="toggleChip(this)">${a}</label>`;
-              audGrid.appendChild(chip);
-            });
-          }
         } catch (e) { console.error("fetchMetadata failed", e); }
       }
 
@@ -1326,7 +978,6 @@
 
       function renderSourceFilters() {
         const sel = document.getElementById("sel-src");
-        const grid = document.getElementById("src-grid");
         const t = I18N[currentLang];
 
         if (sel) {
@@ -1346,24 +997,6 @@
           });
           sel.value = filtered.find(s => s.id === currentVal) ? currentVal : "";
         }
-
-        if (grid) {
-          grid.innerHTML = "";
-          ALL_SOURCES.forEach((s) => {
-            const chip = document.createElement("div");
-            chip.innerHTML = `<input type="checkbox" id="s-${s.id}" class="src-chip-input" value="${s.id}" style="display:none;"><label for="s-${s.id}" style="background:var(--bg); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:0.7rem; font-weight:700; cursor:pointer;" onclick="toggleChip(this)">${s.name}</label>`;
-            grid.appendChild(chip);
-          });
-        }
-      }
-
-      function toggleChip(l) {
-        setTimeout(() => {
-          const cb = document.getElementById(l.getAttribute("for"));
-          if (!cb) return;
-          l.style.background = cb.checked ? "var(--primary)" : "var(--bg)";
-          l.style.color = cb.checked ? "#fff" : "var(--text)";
-        }, 10);
       }
 
       async function fetchFeed() {
@@ -1407,16 +1040,24 @@
 
         container.innerHTML = items.map((item) => {
             const { oneLiner } = parseSummary(item.summary, currentLang);
-            const isHigh = item.impact_tier === "Critical" || item.impact_tier === "High";
+            const isHigh = item.impact_level === "critical" || item.impact_level === "high";
             const audienceTags = (item.affected_audience || [])
               .map(a => `<span class="badge" style="background:transparent; border:1px solid var(--border); cursor:pointer;" onclick="event.stopPropagation(); document.getElementById('sel-audience').value='${a}'; resetAndFetch();">${a}</span>`)
               .join("");
 
             const displayTitle = oneLiner || item.title;
-            const isNews = feedType === "news";
+
+            // Image resolution logic matching mobile app
+            let imageUrl = item.image_url;
+            if (!imageUrl) {
+                const ext = LOGO_EXT[item.source_id] || "png";
+                imageUrl = `/static/logos/${item.source_id}.${ext}`;
+            }
+            const finalImage = imageUrl || "https://images.unsplash.com/photo-1504711434969-e33886168f5c?auto=format&fit=crop&q=80&w=1000";
 
             return `
                 <div class="feed-item" onclick="showFullContent('${item.id}')" style="${isHigh ? 'border-color: var(--error);' : ''}">
+                    <div style="background-image: url('${finalImage}'); height: 180px; background-size: cover; background-position: center; border-radius: 8px; background-color: var(--border);"></div>
                     <a href="${item.fetch_url || item.source_url}" target="_blank" class="icon-link" onclick="event.stopPropagation()">↗</a>
                     <div class="feed-meta">
                         <span class="badge badge-primary">${(item.source_name || item.source_id || "GOV").toUpperCase()}</span>
@@ -1498,7 +1139,6 @@
           const d = await res.json();
           
           let metaHtml = `<div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">`;
-          const isNews = d.source_id.includes('top_stories'); // Heuristic or we could use the field if returned
           metaHtml += `<span class="badge badge-primary">${(d.source_name || d.source_id).toUpperCase()}</span>`;
           metaHtml += `<span style="font-size:0.8rem; color:var(--text-muted); font-weight:700;">${formatDate(d.ingested_at)}</span>`;
           

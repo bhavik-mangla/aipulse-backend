@@ -1,7 +1,7 @@
 """
 Category listing and statistics endpoints.
 GET /categories - list all available categories
-GET /categories/{id}/stats - category statistics (notice count, latest date)
+GET /categories/{id}/stats - category statistics (notice count)
 """
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govnotify.api.deps import get_db
-from govnotify.constants import NoticeCategory, CATEGORY_DESCRIPTIONS
-from govnotify.storage.postgres import CategoryDigestORM, DocumentORM
+from govnotify.constants import NoticeCategory
+from govnotify.storage.postgres import DocumentORM
 from govnotify.utils.time import get_utc_now
 
 logger = structlog.get_logger(__name__)
@@ -28,7 +28,6 @@ router = APIRouter()
 class CategoryInfo(BaseModel):
     id: str
     name: str
-    description: str
 
 
 class CategoryListResponse(BaseModel):
@@ -41,20 +40,17 @@ class CategoryStatsResponse(BaseModel):
     name: str
     total_documents: int = 0
     documents_today: int = 0
-    latest_digest_date: Optional[str] = None
-    latest_digest_items: int = 0
 
 
 # Endpoints
 
 @router.get("", response_model=CategoryListResponse)
 async def list_categories():
-    """List all available notification categories."""
+    """List all available categories."""
     categories = [
         CategoryInfo(
             id=cat.value,
             name=cat.value.replace("_", " ").title(),
-            description=CATEGORY_DESCRIPTIONS.get(cat.value, ""),
         )
         for cat in NoticeCategory
     ]
@@ -69,7 +65,7 @@ async def category_stats(
     """Get statistics for a specific category."""
     # Validate category
     try:
-        cat = NoticeCategory(category_id)
+        NoticeCategory(category_id)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -100,21 +96,9 @@ async def category_stats(
     except Exception:
         today_docs = 0
 
-    # Latest digest
-    digest_q = (
-        select(CategoryDigestORM)
-        .where(CategoryDigestORM.category == category_id)
-        .order_by(CategoryDigestORM.date.desc())
-        .limit(1)
-    )
-    digest_result = await db.execute(digest_q)
-    latest_digest = digest_result.scalar_one_or_none()
-
     return CategoryStatsResponse(
         category=category_id,
-        name=cat.value.replace("_", " ").title(),
+        name=category_id.replace("_", " ").title(),
         total_documents=total_docs,
         documents_today=today_docs,
-        latest_digest_date=latest_digest.date if latest_digest else None,
-        latest_digest_items=latest_digest.item_count if latest_digest else 0,
     )
