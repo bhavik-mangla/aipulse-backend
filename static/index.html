@@ -1057,14 +1057,14 @@
 
             return `
                 <div class="feed-item" onclick="showFullContent('${item.id}')" style="${isHigh ? 'border-color: var(--error);' : ''}">
-                    <div style="background-image: url('${finalImage}'); height: 180px; background-size: cover; background-position: center; border-radius: 8px; background-color: var(--border);"></div>
+                    <div style="background-image: url('${finalImage}'); height: 180px; background-size: contain; background-position: center; background-repeat: no-repeat; border-radius: 8px; background-color: #ffffff; border: 1px solid var(--border);"></div>
                     <a href="${item.fetch_url || item.source_url}" target="_blank" class="icon-link" onclick="event.stopPropagation()">↗</a>
                     <div class="feed-meta">
                         <span class="badge badge-primary">${(item.source_name || item.source_id || "GOV").toUpperCase()}</span>
                         <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">${formatDate(item.ingested_at)}</span>
                     </div>
-                    <h3 class="item-title">${displayTitle}</h3>
-                    <div class="feed-meta" style="margin-top:auto;">${audienceTags}</div>
+                    <h3 class="item-title" style="font-size: 1.1rem; line-height: 1.4;">${displayTitle}</h3>
+                    <div class="feed-meta" style="margin-top:auto; display: flex; flex-wrap: wrap; gap: 4px;">${audienceTags}</div>
                 </div>`;
           }).join("");
       }
