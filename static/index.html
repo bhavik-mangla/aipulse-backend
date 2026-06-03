@@ -1061,7 +1061,7 @@
                     <a href="${item.fetch_url || item.source_url}" target="_blank" class="icon-link" onclick="event.stopPropagation()">↗</a>
                     <div class="feed-meta">
                         <span class="badge badge-primary">${(item.source_name || item.source_id || "GOV").toUpperCase()}</span>
-                        <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">${formatDate(item.ingested_at)}</span>
+                        <span style="font-size: 0.65rem; color: var(--text-muted); font-weight: 700;">${formatDate(item.published_at || item.created_at)}</span>
                     </div>
                     <h3 class="item-title" style="font-size: 1.1rem; line-height: 1.4;">${displayTitle}</h3>
                     <div class="feed-meta" style="margin-top:auto; display: flex; flex-wrap: wrap; gap: 4px;">${audienceTags}</div>
@@ -1140,7 +1140,7 @@
           
           let metaHtml = `<div style="display:flex; flex-wrap:wrap; align-items:center; gap:8px;">`;
           metaHtml += `<span class="badge badge-primary">${(d.source_name || d.source_id).toUpperCase()}</span>`;
-          metaHtml += `<span style="font-size:0.8rem; color:var(--text-muted); font-weight:700;">${formatDate(d.ingested_at)}</span>`;
+          metaHtml += `<span style="font-size:0.8rem; color:var(--text-muted); font-weight:700;">${formatDate(d.ingested_at || d.processed_at)}</span>`;
           
           if (d.affected_audience && d.affected_audience.length > 0) {
             d.affected_audience.forEach(a => {
