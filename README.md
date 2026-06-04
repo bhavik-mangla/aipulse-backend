@@ -42,24 +42,25 @@ AIPulse takes a **deterministic approach**:
 
 ## 🚀 Key Features
 
--   **Multi-Source Deterministic Ingestion:** RSS, OData APIs, and robust browser-mimic crawling across government and general news sources.
+-   **Serverless Deterministic Ingestion:** Runs entirely on **GitHub Actions**, bypassing the need for dedicated servers for crawling and ingestion.
+-   **Zero-Cost Maintenance:** Orchestrated to run 100% free using Vercel (API), GitHub Actions (Cron Workers), and free-tier databases.
 -   **AI-Powered NLP Pipeline:**
     *   **Classification:** Automatic categorization (Jobs, Tax, Health, General News, etc.).
     -   **Dual-Language Summarization:** Quick-takes in both **English & Hindi**.
-        *   **Impact Assessment:** Triage notifications by impact level (Critical/High/Medium).
-    -   **Smart Deduplication:** Multi-layer engine using exact hash, near-duplicate (MinHash/LSH), and semantic checks.
-    -   **Public Feed:** High-performance dashboard with full search and language toggling.
+    -   **Impact Assessment:** Triage notifications by impact level (Critical/High/Medium).
+-   **Smart Visuals:** Automated image enrichment via Wikipedia API fallback and unified logo mapping for government portals.
+-   **Multi-Source Ingestion:** RSS, OData APIs, and robust browser-mimic crawling using Playwright.
 
 ---
 
 ## 🛠️ Tech Stack
 
--   **Backend:** FastAPI (Python 3.12)
--   **Task Engine:** Celery & Redis
--   **Database:** PostgreSQL (Relational) & Qdrant (Vector/Semantic Search)
+-   **Backend:** FastAPI (Python 3.12) - Hosted on Vercel
+-   **Orchestration:** GitHub Actions (for scheduled serverless ingestion)
+-   **Database:** PostgreSQL (Relational)
 -   **LLM Orchestration:** LiteLLM (Gemini 1.5, GPT-4o)
 -   **Crawling:** Crawl4AI, Playwright (Stealth), Feedparser
--   **Proxy Management:** Automated rotation of high-quality free proxies.
+-   **Images:** Wikipedia API for fallback news visuals
 
 ---
 
@@ -67,10 +68,10 @@ AIPulse takes a **deterministic approach**:
 
 ```mermaid
 graph TD
-    Sources[Gov Portals / General APIs] -->|Ingest| Crawler[Crawl4AI / API Client]
-    Crawler -->|Raw Doc| Pipeline[NLP Pipeline]
-    Pipeline -->|Summary / Embedding| DB[(PostgreSQL + Qdrant)]
-    DB -->|API| Web[Web / Mobile App]
+    Sources[Gov Portals / General APIs] -->|Scheduled Trigger| GHA[GitHub Actions]
+    GHA -->|Ingest/AI Enrich| DB[(PostgreSQL)]
+    DB -->|API| Vercel[Vercel Serverless]
+    Vercel -->|JSON| App[Mobile App / Dashboard]
 ```
 
 ---
