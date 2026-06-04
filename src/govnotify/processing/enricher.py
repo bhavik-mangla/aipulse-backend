@@ -160,37 +160,47 @@ class Enricher:
         Returns:
             Dictionary of summary data, or None if LLM unavailable.
         """
-        try:
-            from govnotify.processing.llm_router import get_completion
-            prompt = SUMMARY_PROMPT.format(
-                categories=CATEGORIES_LIST,
-                audiences=AUDIENCES_LIST,
-                impact_tiers=IMPACT_TIERS_LIST,
-                text=text
-            )
-            content = await get_completion(
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.2,
-                max_tokens=1500,
-            )
-            
-            if not content:
-                return None
-            
-            json_str = self._extract_json(content)
-            if not json_str:
-                return None
+        from govnotify.processing.llm_router import get_completion
+        
+        prompt = SUMMARY_PROMPT.format(
+            categories=CATEGORIES_LIST,
+            audiences=AUDIENCES_LIST,
+            impact_tiers=IMPACT_TIERS_LIST,
+            text=text
+        )
 
-            # Validate JSON
-            data = json.loads(json_str)
-            if "quick_take" in data and "key_details" in data:
-                return data
-            
-            logger.warning("llm_response_missing_keys", keys=list(data.keys()))
-            return None
-        except Exception as exc:
-            logger.warning("llm_summarize_failed", error=str(exc))
-            return None
+        # Retry loop for robust extraction
+        for attempt in range(3):
+            try:
+                content = await get_completion(
+                    messages=[{"role": "user", "content": prompt}],
+                    temperature=0.2 if attempt == 0 else 0.3,
+                    max_tokens=1500 + (attempt * 500), # Increase tokens on retry
+                )
+                
+                if not content:
+                    logger.warning("llm_summarize_empty_response", attempt=attempt+1)
+                    continue
+                
+                json_str = self._extract_json(content)
+                if not json_str:
+                    logger.warning("llm_json_extraction_failed", attempt=attempt+1, content_preview=content[:100])
+                    continue
+
+                # Validate JSON
+                data = json.loads(json_str)
+                if "quick_take" in data and "key_details" in data:
+                    if attempt > 0:
+                        logger.info("llm_summarize_success_after_retry", attempt=attempt+1)
+                    return data
+                
+                logger.warning("llm_response_missing_keys", keys=list(data.keys()), attempt=attempt+1)
+            except Exception as exc:
+                logger.warning("llm_summarize_attempt_failed", attempt=attempt+1, error=str(exc))
+                if attempt == 2:
+                    break
+        
+        return None
 
     def _extract_json(self, content: str) -> str | None:
         """

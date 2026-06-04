@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import select, func, or_, and_, desc
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -76,6 +76,7 @@ def map_orm_to_feed_item(doc: DocumentORM) -> FeedItem:
 
 @router.get("/latest", response_model=FeedResponse)
 async def get_latest(
+    response: Response,
     page: int = Query(1, ge=1),
     page_size: int = Query(15, ge=1, le=100),
     feed_type: str = Query("all"),  # news, official, all
@@ -86,6 +87,7 @@ async def get_latest(
     db: AsyncSession = Depends(get_db),
 ):
     """Get the latest documents with filtering and pagination."""
+    response.headers["Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=300"
     stmt = select(DocumentORM).where(
         DocumentORM.is_duplicate == False,
         DocumentORM.ingested_at >= HIDE_BEFORE_DATETIME
@@ -133,6 +135,7 @@ async def get_latest(
 
 @router.get("/search", response_model=FeedResponse)
 async def search(
+    response: Response,
     q: str = Query(..., min_length=1),
     page: int = Query(1, ge=1),
     page_size: int = Query(15, ge=1, le=100),
@@ -141,6 +144,7 @@ async def search(
     db: AsyncSession = Depends(get_db),
 ):
     """Search documents by title or summary."""
+    response.headers["Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=300"
     search_filter = or_(
         DocumentORM.title.ilike(f"%{q}%"),
         DocumentORM.summary.ilike(f"%{q}%"),
@@ -186,9 +190,11 @@ async def search(
 @router.get("/{document_id}", response_model=ProcessedDocument)
 async def get_document(
     document_id: str,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """Get full details of a specific document."""
+    response.headers["Cache-Control"] = "public, s-maxage=3600, stale-while-revalidate=86400"
     doc = await db.get(DocumentORM, document_id)
     if not doc:
         raise HTTPException(

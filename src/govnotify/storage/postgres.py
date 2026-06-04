@@ -22,6 +22,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
 from sqlalchemy.orm import DeclarativeBase, relationship
 
 from govnotify.config import get_settings
@@ -148,10 +149,19 @@ def get_engine():
     global _engine
     if _engine is None:
         settings = get_settings()
+        
+        engine_kwargs = {
+            "pool_pre_ping": True,
+            "echo": settings.app_debug,
+        }
+        
+        # In serverless environments (like Vercel), NullPool prevents connection exhaustion
+        if settings.is_production:
+            engine_kwargs["poolclass"] = NullPool
+            
         _engine = create_async_engine(
             settings.database_url,
-            pool_pre_ping=True,
-            echo=settings.app_debug,
+            **engine_kwargs
         )
     return _engine
 

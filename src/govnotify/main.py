@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from govnotify.config import get_settings
+from govnotify.storage.redis_store import RedisStore
 from govnotify.logging_config import set_correlation_id, setup_logging
 from govnotify.exceptions import GovNotifyError, RateLimitExceeded
 
@@ -48,16 +49,6 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # --- CORS ---
-    # Relaxed for Vercel deployment without custom domain
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
     # --- Request-ID middleware ---
     @app.middleware("http")
     async def request_id_middleware(request: Request, call_next):
@@ -66,6 +57,50 @@ def create_app() -> FastAPI:
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
         return response
+
+    # --- Rate Limiting Middleware ---
+    @app.middleware("http")
+    async def rate_limit_middleware(request: Request, call_next):
+        # Only rate limit API calls in production, skip for OPTIONS (CORS preflight)
+        if (settings.is_production and 
+            request.url.path.startswith("/api/v1") and 
+            request.method != "OPTIONS"):
+            
+            client_ip = request.client.host if request.client else "unknown"
+            redis = RedisStore()
+            # 60 requests per minute per IP
+            is_allowed = await redis.check_rate_limit(
+                user_id=f"ip:{client_ip}", 
+                max_requests=60, 
+                window_seconds=60
+            )
+            if not is_allowed:
+                return JSONResponse(
+                    status_code=429, 
+                    headers={"Retry-After": "60"}, 
+                    content={"detail": "Too many requests. Please try again in a minute."}
+                )
+        
+        return await call_next(request)
+
+    # --- CORS ---
+    # Hardened for production: Only allow known origins
+    # Added last to be the outermost middleware (ensures CORS headers even on 429/500 errors)
+    allowed_origins = [
+        "https://aipulse-daily.vercel.app",
+        "http://localhost:8080",
+        "http://localhost:3000",
+        "capacitor://localhost",
+        "http://localhost",
+    ]
+    
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=allowed_origins if settings.is_production else ["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     # --- Exception handlers ---
     @app.exception_handler(RateLimitExceeded)

@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,8 +45,9 @@ class CategoryStatsResponse(BaseModel):
 # Endpoints
 
 @router.get("", response_model=CategoryListResponse)
-async def list_categories():
+async def list_categories(response: Response):
     """List all available categories."""
+    response.headers["Cache-Control"] = "public, s-maxage=86400, stale-while-revalidate=604800"
     categories = [
         CategoryInfo(
             id=cat.value,
@@ -60,9 +61,11 @@ async def list_categories():
 @router.get("/{category_id}/stats", response_model=CategoryStatsResponse)
 async def category_stats(
     category_id: str,
+    response: Response,
     db: AsyncSession = Depends(get_db),
 ):
     """Get statistics for a specific category."""
+    response.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=600"
     # Validate category
     try:
         NoticeCategory(category_id)

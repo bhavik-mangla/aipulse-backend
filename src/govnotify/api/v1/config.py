@@ -5,7 +5,7 @@ Provides centralized constants (audiences, impact tiers, categories) to the fron
 from __future__ import annotations
 
 import structlog
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 from pydantic import BaseModel
 
 from govnotify.constants import (
@@ -38,8 +38,9 @@ class MetadataResponse(BaseModel):
 
 
 @router.get("/metadata", response_model=MetadataResponse)
-async def get_metadata():
+async def get_metadata(response: Response):
     """Get all master data for filters and UI labels."""
+    response.headers["Cache-Control"] = "public, s-maxage=86400, stale-while-revalidate=604800"
     categories = [
         CategoryMetadata(
             id=cat.value,
@@ -57,6 +58,7 @@ async def get_metadata():
 
 
 @router.get("/sources", response_model=list[SourceMetadata])
-async def get_sources():
+async def get_sources(response: Response):
     """Get all human-readable source names."""
+    response.headers["Cache-Control"] = "public, s-maxage=86400, stale-while-revalidate=604800"
     return [SourceMetadata(id=k, name=v) for k, v in SOURCE_NAMES.items()]
