@@ -28,7 +28,22 @@ logger = structlog.get_logger(__name__)
 async def run_ingestion():
     setup_logging()
     settings = get_settings()
-    engine = get_engine()
+    
+    # Validate Database URL
+    db_url = settings.database_url
+    if not db_url or "change-me" in db_url:
+        logger.error("invalid_database_url", url_provided=db_url)
+        print("\nERROR: DATABASE_URL is missing or using default value.")
+        print("Please ensure you have added the 'DATABASE_URL' secret to your GitHub repository.")
+        sys.exit(1)
+        
+    try:
+        engine = get_engine()
+    except Exception as e:
+        logger.error("database_engine_creation_failed", error=str(e))
+        print(f"\nERROR: Failed to create database engine: {e}")
+        sys.exit(1)
+        
     session_factory = get_session_factory(engine)
     
     now = get_utc_now()
