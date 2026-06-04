@@ -13,6 +13,7 @@ from govnotify.constants import (
     IMPACT_TIERS,
     NoticeCategory,
     CATEGORY_NAMES_HI,
+    SOURCE_NAMES,
 )
 
 logger = structlog.get_logger(__name__)
@@ -23,6 +24,11 @@ class CategoryMetadata(BaseModel):
     id: str
     en: str
     hi: str
+
+
+class SourceMetadata(BaseModel):
+    id: str
+    name: str
 
 
 class MetadataResponse(BaseModel):
@@ -48,3 +54,9 @@ async def get_metadata():
         impact_tiers=IMPACT_TIERS,
         categories=categories
     )
+
+
+@router.get("/sources", response_model=list[SourceMetadata])
+async def get_sources():
+    """Get all human-readable source names."""
+    return [SourceMetadata(id=k, name=v) for k, v in SOURCE_NAMES.items()]

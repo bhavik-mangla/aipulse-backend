@@ -41,7 +41,7 @@ Guidelines:
 - Impact Tier: Categorize as one of: {impact_tiers}.
 - Affected Audience: Identify specific groups from the 'Valid Audiences' list above. You can select multiple.
 - Primary Category: Select the MOST relevant category from the 'Valid Categories' list above.
-- Image Search Query: Provide an accurate 1-5 word entity or concept related to the core subject. Prefer high-signal entities (names of people, places, specific schemes) that yield official or high-quality news imagery. Avoid generic concepts that result in low-quality stock photos.
+- Image Search Query: Provide an accurate 1-3 word entity. Prefer high-signal entities (names of famous companies, people, places, animals, things, specific wikipedia headers) that yield high-quality news imagery. Avoid generic concepts that result in low-quality stock photos.
 - STRICTLY FACTUAL: Only include info explicitly present.
 - For Categories, Impact Tiers and Audience, ONLY select from the provided valid lists. Do NOT create explanations, and new values.
 
