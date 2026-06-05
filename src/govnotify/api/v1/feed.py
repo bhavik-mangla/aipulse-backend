@@ -88,6 +88,12 @@ async def get_latest(
 ):
     """Get the latest documents with filtering and pagination."""
     response.headers["Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=300"
+    
+    # MOBILE APP HACK: If app asks for 15, we give it 40 to help find unread news deeper
+    effective_size = page_size
+    if page_size == 15:
+        effective_size = 40
+
     stmt = select(DocumentORM).where(
         DocumentORM.is_duplicate == False,
         DocumentORM.ingested_at >= HIDE_BEFORE_DATETIME
@@ -118,7 +124,7 @@ async def get_latest(
 
     # Paginate
     stmt = stmt.order_by(desc(DocumentORM.ingested_at))
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    stmt = stmt.offset((page - 1) * effective_size).limit(effective_size)
     
     result = await db.execute(stmt)
     docs = result.scalars().all()
@@ -129,7 +135,7 @@ async def get_latest(
         items=items,
         total=total,
         page=page,
-        page_size=page_size
+        page_size=effective_size
     )
 
 
@@ -145,6 +151,12 @@ async def search(
 ):
     """Search documents by title or summary."""
     response.headers["Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=300"
+    
+    # MOBILE APP HACK: If app asks for 15, we give it 40 to help find unread news deeper
+    effective_size = page_size
+    if page_size == 15:
+        effective_size = 40
+
     search_filter = or_(
         DocumentORM.title.ilike(f"%{q}%"),
         DocumentORM.summary.ilike(f"%{q}%"),
@@ -172,7 +184,7 @@ async def search(
 
     # Paginate
     stmt = stmt.order_by(desc(DocumentORM.ingested_at))
-    stmt = stmt.offset((page - 1) * page_size).limit(page_size)
+    stmt = stmt.offset((page - 1) * effective_size).limit(effective_size)
     
     result = await db.execute(stmt)
     docs = result.scalars().all()
@@ -183,7 +195,7 @@ async def search(
         items=items,
         total=total,
         page=page,
-        page_size=page_size
+        page_size=effective_size
     )
 
 
