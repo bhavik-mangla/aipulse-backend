@@ -89,10 +89,10 @@ async def get_latest(
     """Get the latest documents with filtering and pagination."""
     response.headers["Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=300"
     
-    # MOBILE APP HACK: If app asks for 15, we give it 40 to help find unread news deeper
+    # MOBILE APP HACK: If app asks for 15, we give it 60 to help find unread news deeper
     effective_size = page_size
     if page_size == 15:
-        effective_size = 40
+        effective_size = 60
 
     stmt = select(DocumentORM).where(
         DocumentORM.is_duplicate == False,
@@ -152,10 +152,10 @@ async def search(
     """Search documents by title or summary."""
     response.headers["Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=300"
     
-    # MOBILE APP HACK: If app asks for 15, we give it 40 to help find unread news deeper
+    # MOBILE APP HACK: If app asks for 15, we give it 60 to help find unread news deeper
     effective_size = page_size
     if page_size == 15:
-        effective_size = 40
+        effective_size = 60
 
     search_filter = or_(
         DocumentORM.title.ilike(f"%{q}%"),
