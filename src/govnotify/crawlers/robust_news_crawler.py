@@ -191,6 +191,19 @@ class RobustNewsCrawler(AbstractCrawler):
             parsed = feedparser.parse(content)
             results = []
             feed_title = parsed.feed.get("title", "")
+
+            if not parsed.entries:
+                # An empty feed and a bot-challenge page both parse to zero
+                # entries, and silently returning [] made them indistinguishable.
+                # PBS, for one, answers with HTTP 202 and an HTML interstitial.
+                looks_like_html = content.lstrip()[:200].lower().startswith(("<!doctype html", "<html"))
+                logger.warning(
+                    "rss_no_entries",
+                    url=url,
+                    status=status,
+                    bytes=len(content),
+                    reason="blocked_or_not_a_feed" if looks_like_html else "feed_is_empty",
+                )
             
             for entry in parsed.entries:
                 # We only return metadata for RSS entries; content is fetched later via extract()

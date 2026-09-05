@@ -156,7 +156,7 @@ SOURCE_NAMES = {
     "bs_top_stories": "Business Standard",
     # United States
     "npr_us": "NPR",
-    "pbs_us": "PBS NewsHour",
+    "csmonitor_us": "The Christian Science Monitor",
     "cbs_us": "CBS News",
     "abc_us": "ABC News",
 }

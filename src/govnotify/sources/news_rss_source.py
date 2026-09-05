@@ -271,10 +271,13 @@ NEWS_FEEDS = [
         "url": "https://feeds.npr.org/1001/rss.xml",
     },
     {
-        "id": "pbs_us",
-        "name": "PBS NewsHour",
+        # PBS NewsHour was here and had to go: its feed parses fine from a
+        # plain HTTP client but answers the crawler with an HTTP 202 bot
+        # challenge page, so it yielded zero articles every run.
+        "id": "csmonitor_us",
+        "name": "The Christian Science Monitor",
         "country": Country.UNITED_STATES.value,
-        "url": "https://www.pbs.org/newshour/feeds/rss/headlines",
+        "url": "https://rss.csmonitor.com/feeds/usa",
     },
     {
         "id": "cbs_us",
