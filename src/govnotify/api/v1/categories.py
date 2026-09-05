@@ -5,12 +5,9 @@ GET /categories/{id}/stats - category statistics (notice count)
 """
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Optional
-
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 

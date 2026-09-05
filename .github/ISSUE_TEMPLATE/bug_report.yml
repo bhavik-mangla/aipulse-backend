@@ -1,0 +1,34 @@
+name: Bug report
+description: Something is not working
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output or logs
+      render: text
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where did you hit this?
+      options: ["Ingestion pipeline", "API", "Running locally", "Not sure"]

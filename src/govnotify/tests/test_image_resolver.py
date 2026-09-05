@@ -1,4 +1,3 @@
-import asyncio
 import os
 import sys
 import unittest
@@ -61,7 +60,7 @@ class TestImageResolver(unittest.IsolatedAsyncioTestCase):
     async def test_resolve_image_tier4_logo(self):
         # Ensure higher tiers return None
         self.raw_doc.metadata = {}
-        self.raw_doc.source_id = "income_tax" # Allowed source for search but we'll mock search failure
+        self.raw_doc.source_id = "et_top_stories"  # has a bundled logo
         
         with patch.object(self.resolver, '_search_wikipedia_image', new_callable=AsyncMock) as mock_wiki:
             mock_wiki.return_value = None
@@ -70,7 +69,7 @@ class TestImageResolver(unittest.IsolatedAsyncioTestCase):
                 
                 image_url = await self.resolver.resolve_image(self.raw_doc, search_query="Test Query")
                 
-                self.assertEqual(image_url, "/static/logos/income_tax.png")
+                self.assertEqual(image_url, "/static/logos/et_top_stories.png")
 
     async def test_search_wikipedia_image_success(self):
         mock_response = MagicMock()

@@ -47,6 +47,7 @@ class SourceORM(Base):
     schedule_cron = Column(String(50), default="0 4 * * *")
     enabled = Column(Boolean, default=True)
     region_tags = Column(JSONB, default=list)
+    country = Column(String(10), default="world", index=True)
     category_tags = Column(JSONB, default=list)
     language = Column(String(20), default="en")
     crawler_class = Column(String(255), nullable=False)
@@ -81,6 +82,8 @@ class DocumentORM(Base):
     title = Column(Text, nullable=False)
     clean_text = Column(Text, nullable=True)
     summary = Column(Text, nullable=True)
+    # Retained so translations produced before Hindi was archived are not
+    # destroyed; nothing writes to it now. See archive/hindi-localisation.
     summary_hindi = Column(Text, nullable=True)
     image_url = Column(Text, nullable=True)
     image_search_query = Column(Text, nullable=True)
@@ -89,6 +92,12 @@ class DocumentORM(Base):
     regions = Column(JSONB, default=list)
     departments = Column(JSONB, default=list)
     impact_tier = Column(String(50), default="Medium", index=True)
+    # Feed scope this document belongs to: world, in, us. Null for documents
+    # ingested before scopes existed, which are excluded from country feeds.
+    country = Column(String(10), nullable=True, index=True)
+    # Whether this story justifies interrupting a reader. Deliberately rare:
+    # notifications that are usually ignored teach people to ignore all of them.
+    notification_worthy = Column(Boolean, default=False, nullable=False, index=True)
     affected_audience = Column(JSONB, default=list)
     entities = Column(JSONB, default=dict)
     notification_number = Column(String(255), nullable=True)
@@ -114,8 +123,11 @@ class DocumentORM(Base):
         Index("idx_documents_regions", "regions", postgresql_using="gin"),
         # Every feed request filters on is_duplicate and orders by ingested_at
         # descending; this covers that access path directly.
+        # Every feed request filters on country and is_duplicate, then orders
+        # by ingested_at descending.
         Index(
             "idx_documents_feed",
+            "country",
             "is_duplicate",
             ingested_at.desc(),
         ),

@@ -1,115 +1,112 @@
-# 🏛️ AIPulse
+# AI Pulse — backend
 
-**Stay Informed with Curated General News and Official Government Sources.**
+Short, readable news cards from outlets chosen for editorial independence.
+Pick a region, swipe through the day, tap a card for the detail.
 
-AIPulse is a production-grade, extensible platform that ingests general public interest news and official government notifications from dozens of sources, enriches them with AI-powered insights, and provides them via a modern web interface.
+This repository is the ingestion pipeline and API. The mobile app lives in
+[ai-pulse-app](https://github.com/bhavik-mangla/ai-pulse-app).
 
----
-
-## 📥 Get the App
-
-### **iOS (Public Beta)**
-<a href="https://apps.apple.com/us/app/ai-pulse-daily-short-news/id6770227108">
-  <img src="https://developer.apple.com/app-store/marketing/guidelines/images/badge-download-on-the-app-store.svg" height="54">
-</a>
-
-### **Android (Closed Testing)**
-To test the Android version, follow these steps:
-1. **Join the Testers Group**: [Join Google Group](https://groups.google.com/g/ai-pulse-testers) (Required for access).
-2. **Opt-in to Testing**: [Enable Testing on Play Store](https://play.google.com/apps/testing/com.daily.aipulse).
-3. **Download**: [Get it on Google Play](https://play.google.com/store/apps/details?id=com.daily.aipulse).
-
-**Mobile App Repository:** [ai-pulse-app](https://github.com/bhavik-mangla/ai-pulse-app)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 
 ---
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/release/python-3120/)
-[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://www.docker.com/)
+> [!NOTE]
+> **The project is paused.** Scheduled ingestion is switched off, so the hosted
+> API serves whatever was last ingested and nothing new arrives. Everything
+> still runs locally, and re-enabling the schedule is one uncommented line in
+> `.github/workflows/ingest.yml`. Contributions are still welcome.
 
----
+## What it does
 
-## 🌟 The Challenge & Our Solution
+Every couple of hours it reads a set of RSS feeds, extracts the full article
+text, has an LLM write a two-sentence summary plus a few key details,
+deduplicates stories that several outlets are carrying, and serves the result
+as JSON.
 
-Modern information portals are often dynamic "React/Liferay black boxes." Standard scrapers fail due to inconsistent slugs, dynamic rendering, and hidden metadata.
+**It runs entirely on free tiers.** GitHub Actions for the scheduled work,
+Vercel for the API, a free Postgres. There is no server to administer, and that
+constraint shapes most of the design — see
+[docs/architecture.md](docs/architecture.md).
 
-AIPulse takes a **deterministic approach**:
-1.  **Reverse-Engineering internal APIs:** We bypass brittle DOM parsing and query the same Headless CMS endpoints used by the portal frontends.
-2.  **Taxonomy Mapping:** We use backend Category IDs to filter relevant updates and legal notifications from noise.
-3.  **100% Accuracy:** By using internal document library paths and direct API access, we eliminate 404 errors and ensure 1:1 matching with official sources.
+## Regions and sources
 
----
+| Region | Outlets |
+|---|---|
+| 🌍 World | BBC News, France 24, DW |
+| 🇮🇳 India | The Hindu, Indian Express, Economic Times, Mint, Business Standard |
+| 🇺🇸 United States | NPR, PBS NewsHour, CBS News, ABC News |
 
-## 🚀 Key Features
+Outlets are selected on one rule: **prefer structural editorial independence** —
+public broadcasters operating under an independence charter, and papers with a
+straight-news reporting record. Outlets whose ownership or funding gives a
+documented editorial steer are excluded, as is anyone running paid content.
 
--   **Serverless Deterministic Ingestion:** Runs entirely on **GitHub Actions**, bypassing the need for dedicated servers for crawling and ingestion.
--   **Zero-Cost Maintenance:** Orchestrated to run 100% free using Vercel (API), GitHub Actions (Cron Workers), and free-tier databases.
--   **AI-Powered NLP Pipeline:**
-    *   **Classification:** Automatic categorization (Jobs, Tax, Health, General News, etc.).
-    -   **Dual-Language Summarization:** Quick-takes in both **English & Hindi**.
-    -   **Impact Assessment:** Triage notifications by impact level (Critical/High/Medium).
--   **Smart Visuals:** Automated image enrichment via Wikipedia API fallback and unified logo mapping for government portals.
--   **Multi-Source Ingestion:** RSS, OData APIs, and robust browser-mimic crawling using Playwright.
+Wire services would be ideal, but Reuters and AP have both retired their public
+RSS feeds.
 
----
+Disagree with a call? [Open an issue](../../issues/new?template=new_source.yml).
+It is a judgement, and it should be arguable.
 
-## 🛠️ Tech Stack
+## Getting started
 
--   **Backend:** FastAPI (Python 3.12) - Hosted on Vercel
--   **Orchestration:** GitHub Actions (for scheduled serverless ingestion)
--   **Database:** PostgreSQL (Relational)
--   **LLM Orchestration:** LiteLLM (Gemini 1.5, GPT-4o)
--   **Crawling:** Crawl4AI, Playwright (Stealth), Feedparser
--   **Images:** Wikipedia API for fallback news visuals
+You need Python 3.12 and PostgreSQL. **You do not need an API key.**
 
----
+```bash
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt && pip install -e .
 
-## 📦 Architecture
+cp .env.example .env        # set DATABASE_URL
+alembic upgrade head
+python scripts/sync_sources.py
 
-```mermaid
-graph TD
-    Sources[Gov Portals / General APIs] -->|Scheduled Trigger| GHA[GitHub Actions]
-    GHA -->|Ingest/AI Enrich| DB[(PostgreSQL)]
-    DB -->|API| Vercel[Vercel Serverless]
-    Vercel -->|JSON| App[Mobile App / Dashboard]
+# Run the pipeline against a model on your own machine
+ollama serve & ollama pull llama3.2:3b
+LLM_PROVIDER=local LOCAL_LLM_MODEL=llama3.2:3b python scripts/run_github_ingestion.py
+
+# Serve the API
+uvicorn govnotify.main:app --reload --app-dir src
 ```
 
----
+Docs at `/docs` once it is running.
 
-## 🛠️ Installation & Setup
+## Contributing
 
-1.  **Clone the Repo:**
-    ```bash
-    git clone https://github.com/bhavik-mangla/aipulse-backend.git
-    cd aipulse-backend
-    ```
+**Adding a news source is usually one entry in one list**, and it is the most
+useful thing you can do here. [docs/adding-a-source.md](docs/adding-a-source.md)
+walks through checking a feed works and whether an outlet fits.
 
-2.  **Environment Setup:**
-    ```bash
-    cp .env.example .env
-    # Add your API keys (Google Gemini, SendGrid, etc.)
-    ```
+Other good places to start:
 
-3.  **Start Services:**
-    ```bash
-    docker-compose up -d --build
-    ```
+- An outlet's feed has died, or its standards have changed — both are worth an
+  issue
+- The summary prompt in `processing/enricher.py` decides what every card says
+- A region we do not carry yet
 
-4.  **Initial Seed:**
-    ```bash
-    docker-compose exec api python scripts/seed_sources.py
-    ```
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, and read
+[docs/architecture.md](docs/architecture.md) before a larger change.
 
----
+## Useful commands
 
-## 📝 License
+```bash
+python scripts/check_feed.py <url>     # is this feed usable?
+python scripts/check_feed.py --all     # re-check every configured feed
+python scripts/sync_sources.py         # reconcile sources into the database
+python -m unittest discover -s src/govnotify/tests -t src
+```
 
-Distributed under the MIT License. See `LICENSE` for more information.
+## Things that will surprise you
 
----
+- **Sources live in the database.** Ingestion reads its work list from the
+  `sources` table, so adding a feed in code does nothing until
+  `scripts/sync_sources.py` runs.
+- **The package is called `govnotify`.** The project started as an Indian
+  government notification aggregator and pivoted to general news. The rename is
+  outstanding.
+- **Use an instruction-tuned local model, not a reasoning one.** Reasoning
+  models answer a request for JSON with paragraphs of deliberation. Measured on
+  the same article: `qwen3:4b` took **141.6s**, `llama3.2:3b` took **9.1s**.
 
-## 🤝 Contributing
+## Licence
 
-Contributions are welcome! Whether it's adding a new source or improving the NLP pipeline, feel free to open a PR.
-
-*Built with ❤️ for a more informed society.*
+MIT — see [LICENSE](LICENSE).

@@ -1,0 +1,49 @@
+name: Suggest a news source
+description: Propose an outlet to add to a region's feed
+title: "[Source] "
+labels: ["new source", "good first issue"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an outlet. If you would like to add it yourself,
+        [docs/adding-a-source.md](../blob/main/docs/adding-a-source.md) walks
+        through it — it is usually a single entry in one list.
+  - type: input
+    id: outlet
+    attributes:
+      label: Outlet
+      placeholder: e.g. NPR
+    validations:
+      required: true
+  - type: input
+    id: feed
+    attributes:
+      label: RSS feed URL
+      placeholder: https://feeds.npr.org/1001/rss.xml
+    validations:
+      required: true
+  - type: dropdown
+    id: region
+    attributes:
+      label: Region
+      options: ["World", "India", "United States", "A region we do not carry yet"]
+    validations:
+      required: true
+  - type: textarea
+    id: fit
+    attributes:
+      label: Why is this outlet a good fit?
+      description: |
+        We prefer outlets whose editorial independence is structural — public
+        broadcasters under an independence charter, or papers with a
+        straight-news record. Ownership, funding model and reporting record are
+        all relevant.
+    validations:
+      required: true
+  - type: textarea
+    id: check
+    attributes:
+      label: Feed check output
+      description: "Output of `python scripts/check_feed.py <url>`, if you ran it."
+      render: text

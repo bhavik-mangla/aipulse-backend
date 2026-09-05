@@ -7,26 +7,20 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from govnotify.constants import NoticeCategory
+from govnotify.constants import DEFAULT_COUNTRY, NewsCategory
 
 
 class UserPreferences(BaseModel):
-    """User preferences (semantic + filters)."""
-    categories: list[NoticeCategory] = Field(default_factory=list)
+    """Reader preferences."""
+    country: str = Field(
+        default=DEFAULT_COUNTRY, description="Feed scope: world, in, us"
+    )
+    categories: list[NewsCategory] = Field(default_factory=list)
     sources: list[str] = Field(
-        default_factory=list, description="IDs of sources to subscribe to"
+        default_factory=list, description="IDs of outlets to follow"
     )
-    regions: list[str] = Field(
-        default_factory=list, description="States/regions of interest"
-    )
-    audiences: list[str] = Field(
-        default_factory=list, description="Target audiences (e.g. Farmers, Investors)"
-    )
-    high_impact_only: bool = Field(
-        default=False, description="Filter for Critical/High impact only"
-    )
-    include_general_news: bool = Field(
-        default=False, description="Include news from general outlets"
+    top_stories_only: bool = Field(
+        default=False, description="Show only the most significant stories"
     )
     language: str = Field(
         default="en", description="Preferred language for summaries"

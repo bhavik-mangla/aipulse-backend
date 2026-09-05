@@ -5,7 +5,7 @@ Defines the AbstractSource ABC that every data source must implement, plus custo
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import AsyncIterator, Any, Optional, Callable, Awaitable
 from contextlib import asynccontextmanager
 

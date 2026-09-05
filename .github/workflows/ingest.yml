@@ -1,14 +1,29 @@
 name: Scheduled Ingestion Pipeline
 
+# The schedule is switched off while the project is paused. Ingestion still
+# runs on demand from the Actions tab, and re-enabling it is a matter of
+# uncommenting the cron below.
+#
+# Leaving it running would keep writing to the database and spending Gemini
+# free-tier quota for a feed nobody is reading.
 on:
-  schedule:
-    - cron: '*/30 * * * *' # Runs every 30 minutes
-  workflow_dispatch: # Allows manual triggering from the GitHub Actions UI
+  # schedule:
+  #   # Sources carry their own staggered cron windows and are only picked up
+  #   # when due, so this just needs to tick often enough to catch them.
+  #   - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+# A long run must never overlap the next tick: two runs ingesting at once
+# would race on deduplication and double up stories.
+concurrency:
+  group: ingestion
+  cancel-in-progress: false
 
 jobs:
   run-ingestion:
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 25
+
     services:
       redis:
         image: redis
@@ -29,6 +44,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      # Playwright and Chromium were only ever needed by the government portal
+      # crawlers. Now that ingestion is RSS plus article extraction over
+      # curl_cffi, the browser install is gone and runs start far faster.
       - name: Install uv and dependencies
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -36,27 +54,24 @@ jobs:
           uv pip install --system -r requirements.txt
           uv pip install --system -e .
 
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
+      - name: Apply database migrations
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: alembic upgrade head
 
-      - name: Install Playwright Chromium
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chromium
-
-      - name: Install Playwright Deps (if cache hit)
-        if: steps.playwright-cache.outputs.cache-hit == 'true'
-        run: npx playwright install-deps chromium
+      # Ingestion reads its work list from the database, so the registry
+      # defined in code has to be reconciled into it first.
+      - name: Sync sources
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          PYTHONPATH: .
+        run: python scripts/sync_sources.py
 
       - name: Run Ingestion Script
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           REDIS_URL: redis://localhost:6379/0
-          ENABLE_LLM: "true" 
+          ENABLE_LLM: "true"
           PYTHONPATH: .
-        run: |
-          python scripts/run_github_ingestion.py
+        run: python scripts/run_github_ingestion.py

@@ -21,7 +21,6 @@ class ProcessedDocument(BaseModel):
     title: str
     clean_text: str = Field(description="Cleaned, normalized text content")
     summary: str = Field(default="", description="AI-generated plain-language summary")
-    summary_hindi: str = Field(default="", description="Hindi translation of summary")
     image_url: Optional[str] = Field(default=None, description="URL to a representative image")
     image_search_query: Optional[str] = Field(default=None, description="LLM-generated query for finding an image")
 
@@ -31,6 +30,10 @@ class ProcessedDocument(BaseModel):
     regions: list[str] = Field(default_factory=list, description="Relevant states/regions")
     departments: list[str] = Field(default_factory=list, description="Issuing departments")
     impact_tier: str = Field(default="Medium", description="Critical/High/Medium/Low")
+    country: str = Field(default="world", description="Feed scope: world, in, us")
+    notification_worthy: bool = Field(
+        default=False, description="Whether interrupting a reader for this is justified"
+    )
     affected_audience: list[str] = Field(default_factory=list, description="Target groups")
 
     # Extracted entities

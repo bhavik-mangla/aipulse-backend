@@ -4,16 +4,14 @@ Includes shared date parsers, header builders, and common text processing.
 """
 from __future__ import annotations
 
+import random
 import re
-from datetime import datetime, timezone
-from typing import Any
 
 import structlog
 
-logger = structlog.get_logger(__name__)
+from govnotify.constants import USER_AGENTS
 
-import random
-from govnotify.constants import USER_AGENTS, DEFAULT_USER_AGENT
+logger = structlog.get_logger(__name__)
 
 def get_standard_headers(user_agent: str | None = None) -> dict[str, str]:
     """Return a dictionary of standard headers for web scraping."""
@@ -32,7 +30,6 @@ def get_standard_headers(user_agent: str | None = None) -> dict[str, str]:
         "Cache-Control": "max-age=0",
     }
 
-from govnotify.utils.time import parse_indian_date
 
 def clean_text(text: str) -> str:
     """Basic text cleanup: remove multiple whitespace, trim."""

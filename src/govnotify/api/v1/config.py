@@ -4,15 +4,21 @@ Provides centralized constants (audiences, impact tiers, categories) to the fron
 """
 from __future__ import annotations
 
+from typing import Optional
+
 import structlog
 from fastapi import APIRouter, Response
 from pydantic import BaseModel
 
+from govnotify.sources.news_rss_source import NEWS_FEEDS
+
 from govnotify.constants import (
-    AUDIENCES,
+    CATEGORY_EMOJIS,
+    CATEGORY_NAMES,
+    COUNTRIES,
+    DEFAULT_COUNTRY,
     IMPACT_TIERS,
-    NoticeCategory,
-    CATEGORY_NAMES_HI,
+    NewsCategory,
     SOURCE_NAMES,
 )
 
@@ -23,16 +29,24 @@ router = APIRouter()
 class CategoryMetadata(BaseModel):
     id: str
     en: str
-    hi: str
+    emoji: str = ""
+
+
+class CountryMetadata(BaseModel):
+    code: str
+    name: str
+    flag: str
 
 
 class SourceMetadata(BaseModel):
     id: str
     name: str
+    country: str
 
 
 class MetadataResponse(BaseModel):
-    audiences: list[str]
+    countries: list[CountryMetadata]
+    default_country: str
     impact_tiers: list[str]
     categories: list[CategoryMetadata]
 
@@ -44,21 +58,38 @@ async def get_metadata(response: Response):
     categories = [
         CategoryMetadata(
             id=cat.value,
-            en=cat.value.replace("_", " ").title(),
-            hi=CATEGORY_NAMES_HI.get(cat.value, cat.value),
+            en=CATEGORY_NAMES["en"].get(cat.value, cat.value.title()),
+            emoji=CATEGORY_EMOJIS.get(cat.value, ""),
         )
-        for cat in NoticeCategory
+        for cat in NewsCategory
     ]
-    
+
     return MetadataResponse(
-        audiences=AUDIENCES,
+        countries=[CountryMetadata(**c) for c in COUNTRIES],
+        default_country=DEFAULT_COUNTRY,
         impact_tiers=IMPACT_TIERS,
-        categories=categories
+        categories=categories,
     )
 
 
 @router.get("/sources", response_model=list[SourceMetadata])
-async def get_sources(response: Response):
-    """Get all human-readable source names."""
+async def get_sources(response: Response, country: Optional[str] = None):
+    """
+    List the outlets we carry, optionally narrowed to one feed scope.
+
+    Read from the registry rather than a name table so this cannot drift from
+    what is actually ingested.
+    """
     response.headers["Cache-Control"] = "public, s-maxage=86400, stale-while-revalidate=604800"
-    return [SourceMetadata(id=k, name=v) for k, v in SOURCE_NAMES.items()]
+
+    sources = [
+        SourceMetadata(
+            id=feed["id"],
+            name=SOURCE_NAMES.get(feed["id"], feed["name"]),
+            country=feed["country"],
+        )
+        for feed in NEWS_FEEDS
+    ]
+    if country:
+        sources = [s for s in sources if s.country == country]
+    return sources

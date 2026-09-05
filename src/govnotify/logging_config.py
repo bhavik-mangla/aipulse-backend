@@ -90,6 +90,5 @@ def setup_logging(env: str | None = None) -> None:
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("amqp").setLevel(logging.WARNING)
-    logging.getLogger("celery").setLevel(logging.INFO)
 
     structlog.get_logger(__name__).info("logging_setup_complete", env=env)

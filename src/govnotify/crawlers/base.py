@@ -1,6 +1,6 @@
 """
 Base crawler interfaces and data models.
-Defines the AbstractCrawler ABC and CrawlResult model used by all crawler implementations (RSS, Crawl4AI, etc.).
+Defines the AbstractCrawler ABC and CrawlResult model used by all crawler implementations (RSS feeds, article extraction, etc.).
 """
 from abc import ABC, abstractmethod
 from typing import Optional

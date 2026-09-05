@@ -5,8 +5,6 @@ Manages connections and key patterns for:
 - Rate limiting
 - Task locks
 """
-from typing import Any
-
 import redis.asyncio as autoredis
 import structlog
 

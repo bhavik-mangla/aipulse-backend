@@ -1,11 +1,11 @@
 """
 Image Resolution Logic.
 Resolves a representative image URL for a news item using a 5-tier fallback:
-1. Article metadata (og:image) - All sources
-2. Wikipedia Page Image - Only for allowed news sources (ET, Mint, BS)
-3. DuckDuckGo Images Search - Fallback for allowed news sources
-4. Source-specific Logo - All sources
-5. Default App Icon - Final fallback (handled by frontend)
+1. Article metadata (og:image) - all sources
+2. Wikipedia page image - from the entity the summarizer identified
+3. DuckDuckGo image search - fallback for that entity
+4. Source-specific logo, where one is bundled
+5. Nothing, and the app falls back to its own placeholder
 
 """
 from __future__ import annotations
@@ -32,30 +32,19 @@ WIKIPEDIA_USER_AGENT = (
 SOURCE_LOGOS = {
     "et_top_stories": "/static/logos/et_top_stories.png",
     "mint_top_stories": "/static/logos/mint_top_stories.png",
-    "bs_top_stories": "https://www.akamai.com/site/en/images/logo/2021/business-standard-logo.svg", # Fallback to remote for BS
-    "rbi_circulars": "/static/logos/rbi_circulars.png",
-    "rbi_press_releases": "/static/logos/rbi_press_releases.png",
-    "sebi_news": "/static/logos/sebi_news.jpg",
-    "pib_press_releases": "/static/logos/pib_press_releases.jpg",
-    "mca_updates": "/static/logos/mca_updates.png",
-    "income_tax": "/static/logos/income_tax.png",
-    "egazette_central": "/static/logos/egazette_central.svg",
-    "ibbi_updates": "/static/logos/ibbi_updates.png",
-    "irdai_updates": "/static/logos/irdai_updates.webp",
-    "meity_updates": "/static/logos/meity_updates.svg",
-    "mha_updates": "/static/logos/mha_updates.svg"
+    "bs_top_stories": "/static/logos/bs_top_stories.png",
 }
 
 def is_news_source(source_id: str) -> bool:
     """
-    Whether a source is a news outlet, and so eligible for image search.
+    Whether a source is eligible for entity image search.
 
-    This replaces a hardcoded allow-list of the three original Indian outlets.
-    That list meant every source added afterwards silently fell through to a
-    logo or no image at all, which would have quietly broken images for every
-    new country.
+    Every source is now a news outlet, so this is always true. It is kept as a
+    named predicate because it replaced a hardcoded allow-list of three Indian
+    outlets, and keeping the seam makes it obvious where to reintroduce a
+    restriction rather than scattering source ids through the resolver again.
     """
-    return source_id.endswith("_top_stories")
+    return bool(source_id)
 
 # Domains to ignore in search results (stock photo sites that return generic/sus images)
 DOMAIN_BLACKLIST = {

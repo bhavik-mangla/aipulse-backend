@@ -7,7 +7,6 @@ Provides:
 from __future__ import annotations
 
 import structlog
-from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govnotify.storage.postgres import get_engine, get_session_factory

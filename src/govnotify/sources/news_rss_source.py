@@ -9,6 +9,7 @@ from typing import AsyncIterator
 
 import structlog
 
+from govnotify.constants import Country
 from govnotify.crawlers.robust_news_crawler import RobustNewsCrawler
 from govnotify.models.source import RawDocument, SourceConfig, SourceType
 from govnotify.sources.base import WebScrapeSource
@@ -160,6 +161,7 @@ class NewsRSSSource(WebScrapeSource):
             metadata.update(crawl_result.metadata)
         metadata["is_news"] = True
         metadata["original_url"] = entry.url
+        metadata["country"] = self._config.country
 
         return self.create_raw_document(
             title=title,
@@ -189,34 +191,125 @@ class NewsRSSSource(WebScrapeSource):
         return await super().health_check()
 
 
+# Feeds by scope.
+#
+# Selection rule: prefer outlets whose editorial independence is structural
+# rather than promised - public broadcasters operating under an independence
+# charter, and papers with a straight-news reporting record. Excluded are
+# outlets whose ownership or funding gives a documented editorial steer, and
+# any outlet with a documented paid-news practice.
+#
+# Reuters and AP would be the natural first choice, being wire services, but
+# both retired their public RSS feeds; AP now returns 401 and Reuters 404.
+#
+# Every feed below was checked live: it parses, returns items, and carries
+# per-item publication dates.
+#
+# Scope is deliberately small. Each source costs LLM calls on every run and
+# the free Gemini tier is the binding constraint, so breadth is traded for
+# staying inside quota.
 NEWS_FEEDS = [
+    # --- World: public broadcasters, each under an editorial independence
+    # charter and funded by a different state, so no single government's
+    # perspective dominates the scope.
+    {
+        "id": "bbc_world",
+        "name": "BBC News",
+        "country": Country.WORLD.value,
+        "url": "https://feeds.bbci.co.uk/news/rss.xml",
+    },
+    {
+        "id": "france24_world",
+        "name": "France 24",
+        "country": Country.WORLD.value,
+        "url": "https://www.france24.com/en/rss",
+    },
+    {
+        "id": "dw_world",
+        "name": "DW",
+        "country": Country.WORLD.value,
+        "url": "https://rss.dw.com/rdf/rss-en-world",
+    },
+    # --- India ---
+    {
+        "id": "thehindu_in",
+        "name": "The Hindu",
+        "country": Country.INDIA.value,
+        "url": "https://www.thehindu.com/news/national/feeder/default.rss",
+    },
+    {
+        "id": "indianexpress_in",
+        "name": "Indian Express",
+        "country": Country.INDIA.value,
+        "url": "https://indianexpress.com/feed/",
+    },
+    # Business papers: narrower remit, but their reporting is factual and they
+    # already carry stored history readers can page back into.
     {
         "id": "et_top_stories",
         "name": "Economic Times",
+        "country": Country.INDIA.value,
         "url": "https://economictimes.indiatimes.com/rssfeedstopstories.cms",
     },
     {
         "id": "mint_top_stories",
         "name": "Mint",
+        "country": Country.INDIA.value,
         "url": "https://www.livemint.com/rss/news",
     },
     {
         "id": "bs_top_stories",
         "name": "Business Standard",
+        "country": Country.INDIA.value,
         "url": "https://www.business-standard.com/rss/home_page_top_stories.rss",
     },
+    # --- United States ---
+    {
+        "id": "npr_us",
+        "name": "NPR",
+        "country": Country.UNITED_STATES.value,
+        "url": "https://feeds.npr.org/1001/rss.xml",
+    },
+    {
+        # PBS NewsHour was here and had to go: its feed parses fine from a
+        # plain HTTP client but answers the crawler with an HTTP 202 bot
+        # challenge page, so it yielded zero articles every run.
+        "id": "csmonitor_us",
+        "name": "The Christian Science Monitor",
+        "country": Country.UNITED_STATES.value,
+        "url": "https://rss.csmonitor.com/feeds/usa",
+    },
+    {
+        "id": "cbs_us",
+        "name": "CBS News",
+        "country": Country.UNITED_STATES.value,
+        "url": "https://www.cbsnews.com/latest/rss/main",
+    },
+    {
+        "id": "abc_us",
+        "name": "ABC News",
+        "country": Country.UNITED_STATES.value,
+        "url": "https://abcnews.go.com/abcnews/topstories",
+    },
 ]
+
+# Sources are staggered across the hour rather than all firing every 30
+# minutes. Nothing is gained by re-reading a feed that publishes a few dozen
+# items a day more often than that, and staggering keeps any single ingestion
+# run small enough to finish inside a GitHub Actions job.
+SCHEDULES = ["7 */2 * * *", "22 */2 * * *", "37 */2 * * *", "52 */2 * * *"]
 
 
 def register_news_sources() -> None:
     """Register every configured news outlet with the source registry."""
-    for feed in NEWS_FEEDS:
+    for index, feed in enumerate(NEWS_FEEDS):
         config = SourceConfig(
             id=feed["id"],
             name=feed["name"],
             source_type=SourceType.RSS,
             url=feed["url"],
-            schedule_cron="*/30 * * * *",
+            country=feed["country"],
+            schedule_cron=SCHEDULES[index % len(SCHEDULES)],
             crawler_class="govnotify.sources.news_rss_source.NewsRSSSource",
             crawler_config={"is_news": True},
             rate_limit_rpm=10,
