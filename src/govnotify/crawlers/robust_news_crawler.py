@@ -2,9 +2,9 @@
 Robust News Crawler using curl_cffi and trafilatura.
 Isolated from core shared logic to bypass aggressive anti-bot protections.
 """
-import asyncio
 import json
 import time
+from datetime import datetime, timezone
 from typing import Optional, Union
 
 import feedparser
@@ -14,9 +14,25 @@ from bs4 import BeautifulSoup
 from curl_cffi.requests import AsyncSession
 
 from govnotify.crawlers.base import AbstractCrawler, CrawlResult
-from govnotify.constants import DEFAULT_USER_AGENT
 
 logger = structlog.get_logger(__name__)
+
+
+def _parse_published(entry) -> str | None:
+    """
+    Publication time from a feed entry as an ISO-8601 UTC string.
+
+    feedparser normalises the many date formats feeds use into a UTC struct,
+    so prefer that over re-parsing the raw string ourselves.
+    """
+    parsed = entry.get("published_parsed") or entry.get("updated_parsed")
+    if not parsed:
+        return None
+    try:
+        return datetime(*parsed[:6], tzinfo=timezone.utc).isoformat()
+    except (TypeError, ValueError):
+        return None
+
 
 class RobustNewsCrawler(AbstractCrawler):
     """
@@ -187,6 +203,7 @@ class RobustNewsCrawler(AbstractCrawler):
                         metadata={
                             "title": entry.get("title", ""),
                             "published": entry.get("published", ""),
+                            "published_at": _parse_published(entry),
                             "author": entry.get("author", ""),
                             "feed_title": feed_title,
                         },

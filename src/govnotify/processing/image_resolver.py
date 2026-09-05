@@ -23,6 +23,10 @@ from govnotify.models.source import RawDocument
 
 logger = structlog.get_logger(__name__)
 
+WIKIPEDIA_USER_AGENT = (
+    "AIPulse/1.0 (news aggregator; https://github.com/bhavik-mangla/aipulse-backend)"
+)
+
 # Mapping of source_id to local static logo URLs
 # These are used as Tier 3 fallbacks
 SOURCE_LOGOS = {
@@ -42,8 +46,16 @@ SOURCE_LOGOS = {
     "mha_updates": "/static/logos/mha_updates.svg"
 }
 
-# Sources allowed to perform external image search (Tier 2)
-SEARCH_ALLOWED_SOURCES = {"et_top_stories", "mint_top_stories", "bs_top_stories"}
+def is_news_source(source_id: str) -> bool:
+    """
+    Whether a source is a news outlet, and so eligible for image search.
+
+    This replaces a hardcoded allow-list of the three original Indian outlets.
+    That list meant every source added afterwards silently fell through to a
+    logo or no image at all, which would have quietly broken images for every
+    new country.
+    """
+    return source_id.endswith("_top_stories")
 
 # Domains to ignore in search results (stock photo sites that return generic/sus images)
 DOMAIN_BLACKLIST = {
@@ -76,14 +88,14 @@ class ImageResolver:
             return image_url
 
         # Tier 2: Wikipedia Page Image (Only for allowed news sources)
-        if search_query and source_id in SEARCH_ALLOWED_SOURCES:
+        if search_query and is_news_source(source_id):
             image_url = await self._search_wikipedia_image(search_query)
             if image_url:
                 logger.info("image_resolved_wikipedia", query=search_query, url=image_url)
                 return image_url
 
         # Tier 3: DuckDuckGo Images (Only for allowed news sources)
-        if search_query and source_id in SEARCH_ALLOWED_SOURCES:
+        if search_query and is_news_source(source_id):
             # Append 'official' to query if it's a person/character to get better results
             refined_query = search_query
             if len(search_query.split()) >= 2:
@@ -125,7 +137,9 @@ class ImageResolver:
             "prop": "pageimages",
             "piprop": "original",
         }
-        headers = {"User-Agent": "GovNotify/1.0 (contact@example.com)"}
+        # Wikipedia asks for a contact in the User-Agent and throttles
+        # requests that use a placeholder address.
+        headers = {"User-Agent": WIKIPEDIA_USER_AGENT}
         
         try:
             async with httpx.AsyncClient(headers=headers, timeout=5.0) as client:

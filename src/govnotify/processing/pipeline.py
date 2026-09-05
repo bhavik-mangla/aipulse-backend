@@ -22,6 +22,18 @@ from govnotify.processing.parser import TextParser
 logger = structlog.get_logger(__name__)
 
 
+def _parse_published_at(value) -> datetime | None:
+    """Accept the ISO string the crawler stores, tolerating anything odd."""
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value))
+    except (TypeError, ValueError):
+        return None
+
+
 class PipelineResult:
     """Result of processing a single document through the pipeline."""
 
@@ -122,9 +134,8 @@ class ProcessingPipeline:
                 enrichment = await self.enricher.enrich(clean_text, raw_doc.title)
             else:
                 # Basic rule-based enrichment if LLM disabled
-                from govnotify.processing.enricher import EnrichmentResult
-                enrichment = self.enricher._rule_based_classify(clean_text, raw_doc.title)
-                enrichment.summary = "" # No summary without LLM
+                enrichment = self.enricher.classify(clean_text, raw_doc.title)
+                enrichment.summary = ""  # No summary without LLM
                 enrichment.confidence_score = 0.5
 
             # Generate document ID
@@ -135,7 +146,13 @@ class ProcessingPipeline:
                 raw_doc, enrichment.image_search_query
             )
 
-            # Step 5: Build ProcessedDocument
+            # Step 5: Register in the dedup indices and keep the SimHash, so
+            # near-duplicate detection survives into later runs.
+            simhash = self.dedup.register(
+                doc_id, raw_doc.content_hash, raw_doc.raw_content, raw_doc.title
+            )
+
+            # Step 6: Build ProcessedDocument
             processed = ProcessedDocument(
                 id=doc_id,
                 source_id=raw_doc.source_id,
@@ -156,16 +173,14 @@ class ProcessingPipeline:
                 affected_audience=enrichment.affected_audience,
                 entities=enrichment.entities,
                 ingested_at=raw_doc.fetched_at,
+                published_at=_parse_published_at(raw_doc.metadata.get("published_at")),
                 notification_number=enrichment.notification_number,
                 language=language,
                 content_hash=raw_doc.content_hash,
+                simhash=simhash,
                 is_duplicate=False,
                 confidence_score=enrichment.confidence_score,
             )
-
-            # Register in dedup indices for future checks
-            self.dedup.register_hash(raw_doc.content_hash, doc_id)
-            self.dedup.register_minhash(doc_id, raw_doc.raw_content)
 
             result.document = processed
 

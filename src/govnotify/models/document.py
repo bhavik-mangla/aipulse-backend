@@ -5,7 +5,6 @@ Defines schemas for documents after processing (enrichment, classification) and 
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
 from typing import Optional
 
 from pydantic import BaseModel, Field, HttpUrl
@@ -43,6 +42,9 @@ class ProcessedDocument(BaseModel):
     # Metadata
     notification_number: Optional[str] = None
     ingested_at: Optional[datetime] = None
+    published_at: Optional[datetime] = Field(
+        default=None, description="When the outlet published the story"
+    )
     processed_at: datetime = Field(default_factory=datetime.utcnow)
     language: str = Field(default="en")
 

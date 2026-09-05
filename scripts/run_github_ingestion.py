@@ -49,7 +49,16 @@ async def run_ingestion():
     now = get_utc_now()
     results = {"triggered": [], "skipped": [], "errors": []}
 
+    # One pipeline, shared by every source. Building it per source gave each
+    # one an empty deduplication index that was discarded afterwards, so the
+    # same story carried by several outlets was stored several times.
+    pipeline = ProcessingPipeline(enable_llm=settings.enable_llm)
+
     async with session_factory() as session:
+        # Seed the dedup indices with recently ingested documents so
+        # near-duplicate detection spans runs, not just this one.
+        await pipeline.dedup.load_recent_window(session)
+
         stmt = select(SourceORM).where(SourceORM.enabled == True)
         result = await session.execute(stmt)
         sources_orm = result.scalars().all()
@@ -93,8 +102,7 @@ async def run_ingestion():
             
             try:
                 source = SourceRegistry.get(source_id)
-                pipeline = ProcessingPipeline(enable_llm=settings.enable_llm)
-                
+
                 fetched_count = 0
                 new_count = 0
                 dup_count = 0
@@ -141,9 +149,11 @@ async def run_ingestion():
                                 image_url=getattr(doc, "image_url", None),
                                 image_search_query=getattr(doc, "image_search_query", None),
                                 ingested_at=get_utc_now(),
+                                published_at=doc.published_at,
                                 entities=getattr(doc, "entities", {}),
                                 language=doc.language,
                                 content_hash=doc.content_hash,
+                                simhash=doc.simhash,
                                 is_duplicate=False,
                                 confidence_score=doc.confidence_score,
                             )
