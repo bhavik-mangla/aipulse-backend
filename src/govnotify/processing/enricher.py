@@ -54,6 +54,13 @@ Guidelines:
   Medium = ordinary newsworthy story.
   Low = routine, niche or soft news.
 - Primary Category: the single best fit from the Valid Categories list.
+- Notification Worthy: would interrupting someone's day for this story be
+  justified? True for a major development with wide consequence, or news that
+  changes what someone should do today - an emergency rate cut, a major
+  disaster, a government falling, a large company collapsing. False for
+  routine coverage, incremental updates, opinion, match results, and anything
+  that can wait until the reader next opens the app. Most stories are false,
+  but do not mark a genuinely major event false out of caution.
 - Image Search Query: 1-3 words naming a concrete entity in the story - a
   person, company, place or organisation. Prefer something with recognisable
   news imagery. Avoid abstract concepts, which return generic stock photos.
@@ -73,6 +80,7 @@ Respond with ONLY valid JSON:
   ],
   "impact_tier": "Critical/High/Medium/Low",
   "primary_category": "category_name",
+  "notification_worthy": false,
   "image_search_query": "concrete entity from the story"
 }}
 """
@@ -106,6 +114,8 @@ class EnrichmentResult:
         self.summary: str = ""  # JSON string holding the structured summary
         self.image_search_query: str = ""
         self.impact_tier: str = "Medium"
+        # Whether interrupting a reader for this story would be justified.
+        self.notification_worthy: bool = False
         self.confidence_score: float = 0.0
 
 
@@ -143,6 +153,19 @@ class Enricher:
 
                 impact = summary_data.get("impact_tier", "Medium")
                 result.impact_tier = impact if impact in IMPACT_TIERS else "Medium"
+
+                # Accept only a real boolean true; models express "no" in many
+                # ways, and the safe default for an interruption is not to.
+                #
+                # A Critical tier overrides a false here. Smaller models are
+                # inconsistent across fields and will describe a story as
+                # "major breaking news of wide consequence" while answering
+                # false to the question that follows; a story the model itself
+                # rated Critical should not be silently dropped.
+                result.notification_worthy = (
+                    summary_data.get("notification_worthy") is True
+                    or result.impact_tier == "Critical"
+                )
 
                 # Override rule-based primary category if LLM provided a valid one
                 llm_cat = str(summary_data.get("primary_category", "")).lower()

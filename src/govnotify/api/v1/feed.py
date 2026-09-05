@@ -11,7 +11,7 @@ from typing import Optional
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from pydantic import BaseModel
-from sqlalchemy import Select, desc, func, or_, select
+from sqlalchemy import Select, case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govnotify.api.deps import get_db
@@ -52,6 +52,7 @@ class FeedItem(BaseModel):
     category: str
     impact_level: str
     country: Optional[str] = None
+    notification_worthy: bool = False
     published_at: Optional[datetime] = None
     created_at: datetime
 
@@ -84,6 +85,7 @@ def map_orm_to_feed_item(doc: DocumentORM) -> FeedItem:
         category=parse_category(doc.primary_category).value,
         impact_level=(doc.impact_tier or "Medium").lower(),
         country=doc.country,
+        notification_worthy=bool(doc.notification_worthy),
         # Fall back to ingest time for documents stored before publication
         # dates were captured.
         published_at=doc.published_at or doc.ingested_at,
@@ -260,6 +262,54 @@ async def search(
         search=q,
     )
     return await run_feed_query(db, stmt, page, resolve_page_size(page_size), include_total)
+
+
+@router.get("/digest", response_model=FeedResponse)
+async def digest(
+    response: Response,
+    country: str = Query(DEFAULT_COUNTRY, description="Feed scope: world, in, us"),
+    categories: Optional[str] = Query(None, description="The reader's interests"),
+    limit: int = Query(3, ge=1, le=10),
+    hours: int = Query(24, ge=1, le=168, description="How far back to look"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    The few stories worth interrupting someone for.
+
+    Deliberately small and conservative: only stories the summarizer judged
+    notification-worthy, narrowed to the reader's interests, most significant
+    first. A notification that is usually ignored trains people to ignore all
+    of them, so this returns nothing rather than padding the list.
+    """
+    response.headers["Cache-Control"] = "public, s-maxage=300, stale-while-revalidate=900"
+
+    since = datetime.now(timezone.utc) - timedelta(hours=hours)
+    stmt = build_feed_query(
+        country=resolve_country(country),
+        categories=parse_categories(categories),
+    ).where(
+        DocumentORM.notification_worthy.is_(True),
+        DocumentORM.ingested_at >= since,
+    )
+
+    # Most significant first, then most recent.
+    stmt = stmt.order_by(
+        case(
+            (DocumentORM.impact_tier == "Critical", 0),
+            (DocumentORM.impact_tier == "High", 1),
+            (DocumentORM.impact_tier == "Medium", 2),
+            else_=3,
+        ),
+        desc(DocumentORM.ingested_at),
+    ).limit(limit)
+
+    docs = (await db.execute(stmt)).scalars().all()
+    return FeedResponse(
+        items=[map_orm_to_feed_item(doc) for doc in docs],
+        total=len(docs),
+        page=1,
+        page_size=limit,
+    )
 
 
 @router.get("/{document_id}", response_model=ProcessedDocument)

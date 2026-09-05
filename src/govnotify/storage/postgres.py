@@ -95,6 +95,9 @@ class DocumentORM(Base):
     # Feed scope this document belongs to: world, in, us. Null for documents
     # ingested before scopes existed, which are excluded from country feeds.
     country = Column(String(10), nullable=True, index=True)
+    # Whether this story justifies interrupting a reader. Deliberately rare:
+    # notifications that are usually ignored teach people to ignore all of them.
+    notification_worthy = Column(Boolean, default=False, nullable=False, index=True)
     affected_audience = Column(JSONB, default=list)
     entities = Column(JSONB, default=dict)
     notification_number = Column(String(255), nullable=True)

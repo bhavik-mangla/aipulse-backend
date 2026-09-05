@@ -174,6 +174,7 @@ class ProcessingPipeline:
                 impact_tier=enrichment.impact_tier,
                 entities=enrichment.entities,
                 country=country,
+                notification_worthy=enrichment.notification_worthy,
                 ingested_at=raw_doc.fetched_at,
                 published_at=_parse_published_at(raw_doc.metadata.get("published_at")),
                 notification_number=enrichment.notification_number,
