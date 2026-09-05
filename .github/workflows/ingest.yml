@@ -1,10 +1,16 @@
 name: Scheduled Ingestion Pipeline
 
+# The schedule is switched off while the project is paused. Ingestion still
+# runs on demand from the Actions tab, and re-enabling it is a matter of
+# uncommenting the cron below.
+#
+# Leaving it running would keep writing to the database and spending Gemini
+# free-tier quota for a feed nobody is reading.
 on:
-  schedule:
-    # Sources carry their own staggered cron windows and are only picked up
-    # when due, so this just needs to tick often enough to catch them.
-    - cron: '*/30 * * * *'
+  # schedule:
+  #   # Sources carry their own staggered cron windows and are only picked up
+  #   # when due, so this just needs to tick often enough to catch them.
+  #   - cron: '*/30 * * * *'
   workflow_dispatch:
 
 # A long run must never overlap the next tick: two runs ingesting at once

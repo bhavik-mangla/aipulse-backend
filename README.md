@@ -11,6 +11,12 @@ This repository is the ingestion pipeline and API. The mobile app lives in
 
 ---
 
+> [!NOTE]
+> **The project is paused.** Scheduled ingestion is switched off, so the hosted
+> API serves whatever was last ingested and nothing new arrives. Everything
+> still runs locally, and re-enabling the schedule is one uncommented line in
+> `.github/workflows/ingest.yml`. Contributions are still welcome.
+
 ## What it does
 
 Every couple of hours it reads a set of RSS feeds, extracts the full article
