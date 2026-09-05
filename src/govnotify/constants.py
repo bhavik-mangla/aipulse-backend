@@ -138,23 +138,19 @@ CATEGORY_EMOJIS = {
 SOURCE_NAMES = {
     # World
     "bbc_world": "BBC News",
-    "aljazeera_world": "Al Jazeera",
-    "guardian_world": "The Guardian",
-    "npr_world": "NPR",
+    "france24_world": "France 24",
+    "dw_world": "DW",
     # India
-    "toi_in": "Times of India",
     "thehindu_in": "The Hindu",
-    "ndtv_in": "NDTV",
     "indianexpress_in": "Indian Express",
     "et_top_stories": "Economic Times",
     "mint_top_stories": "Mint",
     "bs_top_stories": "Business Standard",
     # United States
     "npr_us": "NPR",
+    "pbs_us": "PBS NewsHour",
     "cbs_us": "CBS News",
-    "nbc_us": "NBC News",
     "abc_us": "ABC News",
-    "thehill_us": "The Hill",
 }
 
 

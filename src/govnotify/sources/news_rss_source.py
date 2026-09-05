@@ -193,16 +193,25 @@ class NewsRSSSource(WebScrapeSource):
 
 # Feeds by scope.
 #
-# Every outlet here was checked live before being added: it returns a parseable
-# feed with items and per-item images. Outlets are chosen for straight news
-# reporting rather than opinion or aggregation, and public broadcasters and
-# wire-style outlets are preferred where available.
+# Selection rule: prefer outlets whose editorial independence is structural
+# rather than promised - public broadcasters operating under an independence
+# charter, and papers with a straight-news reporting record. Excluded are
+# outlets whose ownership or funding gives a documented editorial steer, and
+# any outlet with a documented paid-news practice.
 #
-# Scope is deliberately small. Each source costs LLM calls on every run, and
+# Reuters and AP would be the natural first choice, being wire services, but
+# both retired their public RSS feeds; AP now returns 401 and Reuters 404.
+#
+# Every feed below was checked live: it parses, returns items, and carries
+# per-item publication dates.
+#
+# Scope is deliberately small. Each source costs LLM calls on every run and
 # the free Gemini tier is the binding constraint, so breadth is traded for
 # staying inside quota.
 NEWS_FEEDS = [
-    # --- World ---
+    # --- World: public broadcasters, each under an editorial independence
+    # charter and funded by a different state, so no single government's
+    # perspective dominates the scope.
     {
         "id": "bbc_world",
         "name": "BBC News",
@@ -210,16 +219,16 @@ NEWS_FEEDS = [
         "url": "https://feeds.bbci.co.uk/news/rss.xml",
     },
     {
-        "id": "aljazeera_world",
-        "name": "Al Jazeera",
+        "id": "france24_world",
+        "name": "France 24",
         "country": Country.WORLD.value,
-        "url": "https://www.aljazeera.com/xml/rss/all.xml",
+        "url": "https://www.france24.com/en/rss",
     },
     {
-        "id": "guardian_world",
-        "name": "The Guardian",
+        "id": "dw_world",
+        "name": "DW",
         "country": Country.WORLD.value,
-        "url": "https://www.theguardian.com/world/rss",
+        "url": "https://rss.dw.com/rdf/rss-en-world",
     },
     # --- India ---
     {
@@ -229,25 +238,13 @@ NEWS_FEEDS = [
         "url": "https://www.thehindu.com/news/national/feeder/default.rss",
     },
     {
-        "id": "ndtv_in",
-        "name": "NDTV",
-        "country": Country.INDIA.value,
-        "url": "https://feeds.feedburner.com/ndtvnews-top-stories",
-    },
-    {
         "id": "indianexpress_in",
         "name": "Indian Express",
         "country": Country.INDIA.value,
         "url": "https://indianexpress.com/feed/",
     },
-    {
-        "id": "toi_in",
-        "name": "Times of India",
-        "country": Country.INDIA.value,
-        "url": "https://timesofindia.indiatimes.com/rssfeedstopstories.cms",
-    },
-    # Kept from the original three: still live, and already carry stored
-    # history that readers can page back into.
+    # Business papers: narrower remit, but their reporting is factual and they
+    # already carry stored history readers can page back into.
     {
         "id": "et_top_stories",
         "name": "Economic Times",
@@ -274,16 +271,16 @@ NEWS_FEEDS = [
         "url": "https://feeds.npr.org/1001/rss.xml",
     },
     {
+        "id": "pbs_us",
+        "name": "PBS NewsHour",
+        "country": Country.UNITED_STATES.value,
+        "url": "https://www.pbs.org/newshour/feeds/rss/headlines",
+    },
+    {
         "id": "cbs_us",
         "name": "CBS News",
         "country": Country.UNITED_STATES.value,
         "url": "https://www.cbsnews.com/latest/rss/main",
-    },
-    {
-        "id": "nbc_us",
-        "name": "NBC News",
-        "country": Country.UNITED_STATES.value,
-        "url": "http://feeds.nbcnews.com/nbcnews/public/news",
     },
     {
         "id": "abc_us",
