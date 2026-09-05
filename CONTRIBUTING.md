@@ -45,9 +45,9 @@ Anything with an OpenAI-compatible API works — Ollama, LM Studio, llama.cpp.
 Set `LOCAL_LLM_BASE_URL` if it is not on `http://localhost:11434`.
 
 **Pick an instruction-tuned model, not a reasoning one.** Reasoning models
-answer a request for JSON with paragraphs of visible deliberation. We measured
-`qwen3:4b` taking 145 seconds for a single article and failing to produce
-usable JSON at all, against a few seconds for `llama3.2:3b`.
+answer a request for JSON with paragraphs of visible deliberation. Measured on the same article: `qwen3:4b`
+took **141.6s**, against **9.1s** for `llama3.2:3b` — 15x, for an identical
+summary.
 
 You can also set `ENABLE_LLM=false` to skip summarization entirely. Ingestion
 still runs and falls back to an extractive summary, which is enough for working

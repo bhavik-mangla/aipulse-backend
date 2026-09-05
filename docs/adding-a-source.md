@@ -86,9 +86,9 @@ instead:
 
 ```bash
 export LLM_PROVIDER=local
-export LOCAL_LLM_MODEL=qwen3:4b     # or any model you have pulled
+export LOCAL_LLM_MODEL=llama3.2:3b  # instruction-tuned, not a reasoning model
 ollama serve &
-ollama pull qwen3:4b
+ollama pull llama3.2:3b
 ```
 
 Anything exposing an OpenAI-compatible API works — Ollama, LM Studio,

@@ -98,9 +98,8 @@ python -m unittest discover -s src/govnotify/tests -t src
   government notification aggregator and pivoted to general news. The rename is
   outstanding.
 - **Use an instruction-tuned local model, not a reasoning one.** Reasoning
-  models answer a request for JSON with paragraphs of deliberation: `qwen3:4b`
-  took 145 seconds on one article and produced nothing parseable, against a few
-  seconds for `llama3.2:3b`.
+  models answer a request for JSON with paragraphs of deliberation. Measured on
+  the same article: `qwen3:4b` took **141.6s**, `llama3.2:3b` took **9.1s**.
 
 ## Licence
 
