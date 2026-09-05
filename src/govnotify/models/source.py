@@ -9,7 +9,6 @@ from typing import Optional
 
 from pydantic import BaseModel, Field, HttpUrl
 
-from govnotify.constants import NoticeCategory
 
 
 class SourceType(str, Enum):
@@ -32,6 +31,10 @@ class SourceConfig(BaseModel):
     region_tags: list[str] = Field(
         default_factory=list, description="Default regions"
     )
+    country: str = Field(
+        default="world",
+        description="Feed scope this source belongs to: world, in, us",
+    )
     language: str = Field(default="en", description="Default language")
     crawler_class: str = Field(
         description="Fully qualified class name of crawler to use"
@@ -46,12 +49,12 @@ class SourceConfig(BaseModel):
         "json_schema_extra": {
             "examples": [
                 {
-                    "id": "pib_press_releases",
-                    "name": "PIB Press Releases",
+                    "id": "bbc_world",
+                    "name": "BBC News",
                     "source_type": "rss",
-                    "url": "https://pib.gov.in/rss/pib_rss.aspx",
+                    "url": "https://feeds.bbci.co.uk/news/rss.xml",
                     "language": "en",
-                    "crawler_class": "govnotify.crawlers.rss_crawler.RSSCrawler",
+                    "crawler_class": "govnotify.sources.news_rss_source.NewsRSSSource",
                 }
             ]
         }

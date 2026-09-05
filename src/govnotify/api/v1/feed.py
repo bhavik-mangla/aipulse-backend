@@ -15,7 +15,13 @@ from sqlalchemy import Select, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govnotify.api.deps import get_db
-from govnotify.constants import HIDE_BEFORE_DATETIME, NoticeCategory, get_source_name
+from govnotify.constants import (
+    DEFAULT_COUNTRY,
+    HIDE_BEFORE_DATETIME,
+    is_valid_country,
+    parse_category,
+)
+from govnotify.constants import get_source_name
 from govnotify.models.document import ProcessedDocument
 from govnotify.storage.postgres import DocumentORM
 
@@ -44,7 +50,7 @@ class FeedItem(BaseModel):
     image_url: Optional[str] = None
     category: str
     impact_level: str
-    affected_audience: list[str]
+    country: Optional[str] = None
     published_at: Optional[datetime] = None
     created_at: datetime
 
@@ -73,14 +79,20 @@ def map_orm_to_feed_item(doc: DocumentORM) -> FeedItem:
         title=doc.title,
         summary=doc.summary or "",
         image_url=doc.image_url,
-        category=doc.primary_category or "other",
+        # Tolerates categories stored under the old government taxonomy.
+        category=parse_category(doc.primary_category).value,
         impact_level=(doc.impact_tier or "Medium").lower(),
-        affected_audience=doc.affected_audience or [],
+        country=doc.country,
         # Fall back to ingest time for documents stored before publication
         # dates were captured.
         published_at=doc.published_at or doc.ingested_at,
         created_at=doc.ingested_at or datetime.now(timezone.utc),
     )
+
+
+def resolve_country(code: str) -> str:
+    """Fall back to the default scope rather than returning an empty feed."""
+    return code if is_valid_country(code) else DEFAULT_COUNTRY
 
 
 def resolve_page_size(requested: int) -> int:
@@ -90,10 +102,9 @@ def resolve_page_size(requested: int) -> int:
 
 def build_feed_query(
     *,
-    feed_type: str = "all",
+    country: str = DEFAULT_COUNTRY,
     category: Optional[str] = None,
     source_id: Optional[str] = None,
-    audience: Optional[str] = None,
     impact_level: Optional[str] = None,
     on_date: Optional[date_type] = None,
     search: Optional[str] = None,
@@ -103,10 +114,15 @@ def build_feed_query(
 
     Both endpoints previously repeated this block verbatim, which is how the
     date filter came to be accepted by the app but implemented by neither.
+
+    The country filter is always applied. Besides scoping the feed, it is what
+    keeps the retired government notices out: those documents have a NULL
+    country and so match no scope.
     """
     stmt = select(DocumentORM).where(
         DocumentORM.is_duplicate.is_(False),
         DocumentORM.ingested_at >= HIDE_BEFORE_DATETIME,
+        DocumentORM.country == country,
     )
 
     if category:
@@ -115,16 +131,8 @@ def build_feed_query(
     if source_id:
         stmt = stmt.where(DocumentORM.source_id == source_id)
 
-    if audience:
-        stmt = stmt.where(DocumentORM.affected_audience.contains([audience]))
-
     if impact_level == "high_only":
         stmt = stmt.where(DocumentORM.impact_tier.in_(["Critical", "High"]))
-
-    if feed_type == "news":
-        stmt = stmt.where(DocumentORM.source_id.contains("top_stories"))
-    elif feed_type == "official":
-        stmt = stmt.where(~DocumentORM.source_id.contains("top_stories"))
 
     if on_date:
         # Half-open range over the calendar day so the index on the timestamp
@@ -184,10 +192,9 @@ async def get_latest(
     response: Response,
     page: int = Query(1, ge=1),
     page_size: int = Query(MOBILE_PAGE_SIZE, ge=1, le=100),
-    feed_type: str = Query("all", description="news | official | all"),
+    country: str = Query(DEFAULT_COUNTRY, description="Feed scope: world, in, us"),
     category: Optional[str] = None,
     source_id: Optional[str] = None,
-    audience: Optional[str] = None,
     impact_level: Optional[str] = None,
     date: Optional[date_type] = Query(None, description="Restrict to one day (YYYY-MM-DD)"),
     include_total: bool = Query(True, description="Set false to skip the count query"),
@@ -197,10 +204,9 @@ async def get_latest(
     response.headers["Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=300"
 
     stmt = build_feed_query(
-        feed_type=feed_type,
+        country=resolve_country(country),
         category=category,
         source_id=source_id,
-        audience=audience,
         impact_level=impact_level,
         on_date=date,
     )
@@ -213,10 +219,9 @@ async def search(
     q: str = Query(..., min_length=1),
     page: int = Query(1, ge=1),
     page_size: int = Query(MOBILE_PAGE_SIZE, ge=1, le=100),
-    feed_type: str = Query("all"),
+    country: str = Query(DEFAULT_COUNTRY, description="Feed scope: world, in, us"),
     category: Optional[str] = None,
     source_id: Optional[str] = None,
-    audience: Optional[str] = None,
     impact_level: Optional[str] = None,
     date: Optional[date_type] = Query(None, description="Restrict to one day (YYYY-MM-DD)"),
     include_total: bool = Query(True, description="Set false to skip the count query"),
@@ -226,10 +231,9 @@ async def search(
     response.headers["Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=300"
 
     stmt = build_feed_query(
-        feed_type=feed_type,
+        country=resolve_country(country),
         category=category,
         source_id=source_id,
-        audience=audience,
         impact_level=impact_level,
         on_date=date,
         search=q,
@@ -264,13 +268,12 @@ async def get_document(
         image_url=doc.image_url,
         image_search_query=doc.image_search_query,
         categories=doc.categories or [],
-        primary_category=(
-            NoticeCategory(doc.primary_category) if doc.primary_category else NoticeCategory.OTHER
-        ),
+        primary_category=parse_category(doc.primary_category),
         regions=doc.regions or [],
         departments=doc.departments or [],
         impact_tier=doc.impact_tier or "Medium",
         affected_audience=doc.affected_audience or [],
+        country=doc.country or DEFAULT_COUNTRY,
         entities=doc.entities or {},
         notification_number=doc.notification_number,
         ingested_at=doc.ingested_at,

@@ -1,18 +1,15 @@
 """
-Text extraction and cleaning from HTML, PDF, and plain text.
-Primary libraries:
+Text extraction and cleaning from HTML and plain text.
+
 - HTML: trafilatura (Markdown extraction) with BeautifulSoup4 fallback
-- PDF: PaddleOCR (High-accuracy OCR) with PyMuPDF and pdfplumber fallback
 - Text detection: basic content-type routing
+
+PDF and OCR handling was removed with the government portal sources, which
+were the only things that produced PDFs.
 """
 from __future__ import annotations
 
-import io
-import os
 import re
-import tempfile
-import threading
-from typing import Optional
 
 import structlog
 
@@ -28,78 +25,17 @@ class TextParser:
     """Extract and clean text (Markdown) from various content types."""
 
     # Static singleton for the PaddleOCR engine to avoid re-initialization
-    # _paddle_ocr = None
-    # _paddle_ocr_pid = None
-    # _paddle_lock = threading.Lock()
-
-    @classmethod
-    def _get_paddle_ocr(cls):
-        """
-        Get or initialize the PaddleOCR engine.
-        Ensures initialization happens only in the current process after fork.
-        """
-        return None
-        # # Global kill switch
-        # if os.environ.get("DISABLE_PADDLEOCR", "False").lower() == "true":
-        #     return None
-        # ... (rest of commented out method)
-
-
-    def is_complex_pdf(self, pdf_bytes: bytes) -> bool:
-        """
-        Identify if a PDF is 'complex' (scanned, stamped, or heavily layouted).
-        A PDF is complex if:
-        1. It's scanned (little to no extractable text).
-        2. It contains many images relative to its page count (likely stamps/charts).
-        3. Simple text extraction yields messy results (low density).
-        """
-        try:
-            import fitz
-            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            total_pages = len(doc)
-            if total_pages == 0:
-                return False
-
-            scanned_pages = 0
-            # Check up to 10 pages for better robustness against mixed-type documents
-            check_pages = min(total_pages, 10)
-            
-            for i in range(check_pages):
-                page = doc[i]
-                text = page.get_text().strip()
-                images = page.get_images()
-                
-                # If a page has very little text but has images, it's likely scanned or stamped
-                if len(text) < 100 and images:
-                    scanned_pages += 1
-                # If page has absolutely no text, it's definitely scanned
-                elif not text:
-                    scanned_pages += 1
-                # If page has many images (> 5), it's probably complex
-                elif len(images) > 5:
-                    scanned_pages += 1
-
-            doc.close()
-            # If more than 50% of checked pages look complex, mark whole PDF as complex
-            return (scanned_pages / check_pages) >= 0.5
-        except Exception as exc:
-            logger.debug("pdf_complexity_check_failed", error=str(exc))
-            # Fallback to complex to be safe if it's a valid PDF but analysis failed
-            return True
-
     async def extract(self, content: str, content_type: str) -> str:
         """
         Extract clean text/markdown from raw content based on content type.
         Args:
             content: Raw content (HTML, PDF text, plain text).
-            content_type: MIME type (text/html, application/pdf, text/plain).
+            content_type: MIME type (text/html, text/markdown, text/plain).
         Returns:
             Cleaned, normalized Markdown or plain text.
         """
         if "html" in content_type or "xml" in content_type:
             return self._extract_html(content)
-        elif "pdf" in content_type:
-            return self._extract_pdf_text(content)
         else:
             return self._clean_text(content)
 
@@ -154,122 +90,6 @@ class TextParser:
             return text
         except Exception as exc:
             logger.debug("bs4_extract_failed", error=str(exc))
-            return ""
-
-    def _extract_pdf_text(self, content: str) -> str:
-        """
-        Extract text from PDF content string.
-        Note: For actual PDF bytes, use extract_pdf_from_bytes().
-        """
-        return self._clean_text(content)
-
-    async def extract_pdf_from_bytes(self, pdf_bytes: bytes) -> str:
-        """
-        Extract high-fidelity text from PDF bytes.
-        For simple digital docs, uses PyMuPDF for speed.
-        Args:
-            pdf_bytes: Raw PDF file bytes.
-        Returns:
-            Extracted text.
-        """
-        # is_complex = self.is_complex_pdf(pdf_bytes)
-        
-        # # 1. Primary for complex: PaddleOCR (COMMENTED OUT FOR LIGHTWEIGHT)
-        # if is_complex:
-        #     if os.environ.get("DISABLE_PADDLEOCR", "False").lower() == "true":
-        #         logger.info("paddleocr_disabled_by_env_skipping_ocr")
-        #     else:
-        #         logger.info("complex_pdf_detected_using_ocr")
-        #         text = await self._paddleocr_extract(pdf_bytes)
-        #         if text and len(text) > 100:
-        #             return self._clean_text(text)
-
-        # 1. Primary: PyMuPDF (Fast native text)
-        text = self._pymupdf_extract(pdf_bytes)
-        if text and len(text) > 50:
-            return self._clean_text(text)
-            
-        # 2. Final Fallback: pdfplumber
-        text = self._pdfplumber_extract(pdf_bytes)
-        return self._clean_text(text)
-
-    def _get_pages_to_extract(self, total_pages: int) -> list[int]:
-        """
-        Get indices of pages to extract (first N and last M).
-        Args:
-            total_pages: Total number of pages in PDF.
-        Returns:
-            List of 0-based page indices.
-        """
-        if total_pages <= MAX_TOTAL_PAGES:
-            return list(range(total_pages))
-        
-        # Take first 5
-        front = list(range(MAX_FRONT_PAGES))
-        # Take last 5
-        back = list(range(total_pages - MAX_BACK_PAGES, total_pages))
-        
-        # Return unique sorted indices just in case of overlap
-        return sorted(list(set(front + back)))
-
-    async def _paddleocr_extract(self, pdf_bytes: bytes) -> str:
-        """
-        Extract text from PDF bytes using PaddleOCR.
-        Uses the classic ocr() method with stable configuration.
-        """
-        return ""
-        # import asyncio
-        # import fitz
-        # ... (rest of commented out method)
-
-
-    def _pdfplumber_extract(self, pdf_bytes: bytes) -> str:
-        """Extract text using pdfplumber."""
-        try:
-            import pdfplumber
-            with pdfplumber.open(io.BytesIO(pdf_bytes)) as pdf:
-                total_pages = len(pdf.pages)
-                pages_to_extract = self._get_pages_to_extract(total_pages)
-                
-                if total_pages > MAX_TOTAL_PAGES:
-                    logger.debug("pdfplumber_subsetting", total=total_pages, count=len(pages_to_extract))
-
-                text_pages = []
-                for idx in pages_to_extract:
-                    page = pdf.pages[idx]
-                    page_text = page.extract_text()
-                    if page_text:
-                        text_pages.append(page_text)
-                return "\n\n".join(text_pages)
-        except Exception as exc:
-            logger.debug("pdfplumber_extract_failed", error=str(exc))
-            return ""
-
-    def _pymupdf_extract(self, pdf_bytes: bytes) -> str:
-        """Extract text using PyMuPDF (Fitz)."""
-        try:
-            import fitz  # PyMuPDF
-            # OCR logic removed for lightweight build
-            
-            doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-            total_pages = len(doc)
-            pages_to_extract = self._get_pages_to_extract(total_pages)
-            
-            if total_pages > MAX_TOTAL_PAGES:
-                logger.debug("pymupdf_subsetting", total=total_pages, count=len(pages_to_extract))
-
-            text_pages = []
-            for idx in pages_to_extract:
-                page = doc[idx]
-                text = page.get_text()
-                # Scanned page OCR fallback removed for lightweight build
-                
-                if text:
-                    text_pages.append(text)
-            doc.close()
-            return "\n\n".join(text_pages)
-        except Exception as exc:
-            logger.debug("pymupdf_extract_failed", error=str(exc))
             return ""
 
     def _clean_text(self, text: str, preserve_markdown: bool = False) -> str:

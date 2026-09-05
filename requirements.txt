@@ -9,29 +9,16 @@ redis>=6.2.0
 celery[redis]>=5.6.3
 structlog>=25.5.0
 httpx[socks]>=0.28.1
+
+# Ingestion: RSS parsing plus browser-impersonating fetch and article
+# extraction. Playwright, crawl4ai and the PDF stack went with the government
+# portal crawlers, which were the only things that needed them.
 curl_cffi>=0.15.0
 trafilatura>=2.0.0
 feedparser>=6.0.10
-
-crawl4ai>=0.5.0
-litellm>=1.83.0
-# qdrant-client>=1.17.1
-# fastembed>=0.8.0
-datasketch>=1.9.0
-pdfplumber>=0.11.9
-pymupdf>=1.24.9,<1.25.0
-trafilatura>=2.0.0
-ddgs>=9.14.4
 beautifulsoup4>=4.14.3
 lingua-language-detector>=2.1.1
-python-telegram-bot>=22.7
+
+litellm>=1.83.0
+ddgs>=9.14.4
 croniter>=6.2.2
-# paddleocr==2.7.3
-# paddlepaddle==2.6.2
-# numpy<2.0.0
-# layoutparser[layoutmodels,tesseract]>=0.3.4
-# html2text>=2024.2.26
-# opencv-python-headless>=4.11.0.86
-# onnxruntime>=1.20.0
-# paddle2onnx>=1.2.0
-sendgrid>=6.11.0

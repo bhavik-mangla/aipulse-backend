@@ -12,6 +12,7 @@ from datetime import datetime
 import structlog
 
 from govnotify.config import get_settings
+from govnotify.constants import DEFAULT_COUNTRY
 from govnotify.models.document import ProcessedDocument
 from govnotify.models.source import RawDocument
 from govnotify.processing.dedup import DeduplicationEngine
@@ -130,8 +131,12 @@ class ProcessingPipeline:
             # Detect language
             language = self.parser.detect_language(clean_text)
             
+            country = raw_doc.metadata.get("country") or DEFAULT_COUNTRY
+
             if self.enable_llm:
-                enrichment = await self.enricher.enrich(clean_text, raw_doc.title)
+                enrichment = await self.enricher.enrich(
+                    clean_text, raw_doc.title, country=country
+                )
             else:
                 # Basic rule-based enrichment if LLM disabled
                 enrichment = self.enricher.classify(clean_text, raw_doc.title)
@@ -170,8 +175,8 @@ class ProcessingPipeline:
                 primary_category=enrichment.primary_category,
                 departments=[enrichment.department] if enrichment.department else [],
                 impact_tier=enrichment.impact_tier,
-                affected_audience=enrichment.affected_audience,
                 entities=enrichment.entities,
+                country=country,
                 ingested_at=raw_doc.fetched_at,
                 published_at=_parse_published_at(raw_doc.metadata.get("published_at")),
                 notification_number=enrichment.notification_number,

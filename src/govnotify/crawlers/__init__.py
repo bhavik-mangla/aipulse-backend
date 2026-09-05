@@ -1,16 +1,11 @@
 """
-Crawler implementations for fetching content from various source types.
+Crawler implementations.
 """
 from govnotify.crawlers.base import AbstractCrawler, CrawlResult
-from govnotify.crawlers.rss_crawler import RSSCrawler
-from govnotify.crawlers.news_rss_crawler import NewsRSSCrawler
-
-# Crawl4AICrawler is imported lazily to avoid heavy dependency at import time.
-# Use: from govnotify.crawlers.crawl4ai_crawler import Crawl4AICrawler
+from govnotify.crawlers.robust_news_crawler import RobustNewsCrawler
 
 __all__ = [
     "AbstractCrawler",
     "CrawlResult",
-    "RSSCrawler",
-    "NewsRSSCrawler",
+    "RobustNewsCrawler",
 ]

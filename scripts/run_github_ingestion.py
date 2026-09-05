@@ -145,7 +145,7 @@ async def run_ingestion():
                                 regions=doc.regions,
                                 departments=doc.departments,
                                 impact_tier=getattr(doc, "impact_tier", "Medium"),
-                                affected_audience=getattr(doc, "affected_audience", []),
+                                country=getattr(doc, "country", None),
                                 image_url=getattr(doc, "image_url", None),
                                 image_search_query=getattr(doc, "image_search_query", None),
                                 ingested_at=get_utc_now(),

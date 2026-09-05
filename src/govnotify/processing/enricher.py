@@ -1,7 +1,7 @@
 """
-Document enrichment - classification, NER, and metadata extraction.
-Uses LLM (via litellm) for per-document structured summarization.
-Uses rule-based heuristics for classification.
+Article enrichment - summarization and topic classification.
+Uses an LLM for the structured summary, with rule-based keyword classification
+as a baseline and as the fallback when the LLM is unavailable.
 """
 from __future__ import annotations
 
@@ -11,15 +11,12 @@ import re
 import structlog
 
 from govnotify.config import get_settings
-from govnotify.constants import NoticeCategory, AUDIENCES, IMPACT_TIERS
+from govnotify.constants import HINDI_COUNTRIES, IMPACT_TIERS, NewsCategory
 
 logger = structlog.get_logger(__name__)
 
 # List of valid categories for the LLM
-CATEGORIES_LIST = ", ".join([c.value for c in NoticeCategory])
-
-# List of valid audiences to match frontend
-AUDIENCES_LIST = ", ".join(AUDIENCES)
+CATEGORIES_LIST = ", ".join([c.value for c in NewsCategory])
 
 # List of valid impact tiers
 IMPACT_TIERS_LIST = ", ".join(IMPACT_TIERS)
@@ -38,56 +35,80 @@ MAX_LLM_INPUT_CHARS = 8000
 MAX_SUMMARY_ATTEMPTS = 2
 
 SUMMARY_PROMPT = """
-You are an expert news and notices summarizer.
-Extract a concise, high-signal summary and metadata from the document.
-Generate both English and Hindi versions in the same response.
+You are a news editor writing the summary card a reader sees before deciding
+whether to open the full story.
 
 Valid Categories: {categories}
-Valid Audiences: {audiences}
 Valid Impact Tiers: {impact_tiers}
 
 Guidelines:
-- Tone: Professional, easy for humans to read quickly, and all-inclusive of critical facts.
-- Style: Concise but comprehensive.
-- Hindi version: Natural, professional translation of the summary elements.
-- Impact Tier: Categorize as one of: {impact_tiers}.
-- Affected Audience: Identify specific groups from the 'Valid Audiences' list above. You can select multiple.
-- Primary Category: Select the MOST relevant category from the 'Valid Categories' list above.
-- Image Search Query: Provide an accurate 1-3 word entity. Prefer high-signal entities (names of famous companies, people, places, animals, things, specific wikipedia headers) that yield high-quality news imagery. Avoid generic concepts that result in low-quality stock photos.
-- STRICTLY FACTUAL: Only include info explicitly present.
-- For Categories, Impact Tiers and Audience, ONLY select from the provided valid lists. Do NOT create explanations, and new values.
-
+- Quick take: 1-2 sentences that carry the actual news, not a teaser. A reader
+  who reads only this should already know what happened.
+- Key details: 2-4 short bullets adding specifics the quick take left out -
+  numbers, names, dates, what changes and for whom. Do not repeat the quick
+  take.
+- Lead with what happened, not with who reported it.
+- Impact Tier: how significant this story is to a general reader.
+  Critical = major breaking news of wide consequence.
+  High = important national or international development.
+  Medium = ordinary newsworthy story.
+  Low = routine, niche or soft news.
+- Primary Category: the single best fit from the Valid Categories list.
+- Image Search Query: 1-3 words naming a concrete entity in the story - a
+  person, company, place or organisation. Prefer something with recognisable
+  news imagery. Avoid abstract concepts, which return generic stock photos.
+- STRICTLY FACTUAL: only what is explicitly in the text. Never infer or invent
+  figures, quotes or outcomes.
+- No editorialising and no opinion of your own.
+- Use only values from the provided lists for Category and Impact Tier.
+{language_instruction}
 Input text:
 {text}
 
 Respond with ONLY valid JSON:
 {{
-  "quick_take": "A 1-3 line summary in English.",
-  "quick_take_hindi": "हिंदी में 1-3 पंक्तियों का सारांश।",
+  "quick_take": "A 1-2 sentence summary of what happened.",{hindi_take_field}
   "key_details": [
-    "Important facts or requirements in English"
-  ],
-  "key_details_hindi": [
-    "हिंदी में महत्वपूर्ण तथ्य या आवश्यकताएं"
-  ],
+    "Specific fact or figure the quick take did not cover"
+  ],{hindi_details_field}
   "impact_tier": "Critical/High/Medium/Low",
-  "affected_audience": ["Group 1", "Group 2"],
   "primary_category": "category_name",
-  "image_search_query": "relevant entity for image search",
-  "action_required": "Specific action needed or 'None'"
+  "image_search_query": "concrete entity from the story"
 }}
 """
+
+# Hindi is generated only for scopes whose readers are offered it. Producing it
+# for every article roughly doubles output tokens, and the free Gemini tier is
+# the binding constraint on how many sources we can run.
+HINDI_INSTRUCTION = (
+    "- Also provide a natural, professional Hindi translation of the quick "
+    "take and the key details.\n"
+)
+HINDI_TAKE_FIELD = '\n  "quick_take_hindi": "\u0939\u093f\u0902\u0926\u0940 \u092e\u0947\u0902 \u0938\u093e\u0930\u093e\u0902\u0936\u0964",'
+HINDI_DETAILS_FIELD = '\n  "key_details_hindi": ["\u0939\u093f\u0902\u0926\u0940 \u092e\u0947\u0902 \u092e\u0939\u0924\u094d\u0935\u092a\u0942\u0930\u094d\u0923 \u0924\u0925\u094d\u092f"],'
+
+
+def build_prompt(text: str, want_hindi: bool) -> str:
+    """Render the summary prompt, including Hindi fields only when wanted."""
+    return SUMMARY_PROMPT.format(
+        categories=CATEGORIES_LIST,
+        impact_tiers=IMPACT_TIERS_LIST,
+        language_instruction=HINDI_INSTRUCTION if want_hindi else "",
+        hindi_take_field=HINDI_TAKE_FIELD if want_hindi else "",
+        hindi_details_field=HINDI_DETAILS_FIELD if want_hindi else "",
+        text=text,
+    )
 
 
 class EnrichmentResult:
     """Result of document enrichment."""
 
     def __init__(self) -> None:
-        self.categories: list[NoticeCategory] = []
-        self.primary_category: NoticeCategory = NoticeCategory.OTHER
+        self.categories: list[NewsCategory] = []
+        self.primary_category: NewsCategory = NewsCategory.OTHER
         self.notification_number: str | None = None
         self.department: str = ""
-        self.regions: list[str] = ["national"]
+        self.regions: list[str] = []
         self.entities: dict[str, list[str]] = {
             "persons": [],
             "organizations": [],
@@ -99,7 +120,6 @@ class EnrichmentResult:
         self.summary_hindi: str = "" # Will store Hindi summary text
         self.image_search_query: str = ""
         self.impact_tier: str = "Medium"
-        self.affected_audience: list[str] = []
         self.confidence_score: float = 0.0
 
 
@@ -109,15 +129,18 @@ class Enricher:
     def __init__(self) -> None:
         self._settings = get_settings()
 
-    async def enrich(self, clean_text: str, title: str = "") -> EnrichmentResult:
+    async def enrich(
+        self, clean_text: str, title: str = "", country: str | None = None
+    ) -> EnrichmentResult:
         """
-        Classify, extract entities, and summarize a document.
-        Uses rule-based classification and LLM-based structured summarization.
+        Summarize and classify an article.
+
         Args:
-            clean_text: Cleaned document text.
-            title: Document title for additional context.
+            clean_text: Cleaned article text.
+            title: Headline, for additional context.
+            country: Feed scope, which decides whether Hindi is generated.
         Returns:
-            EnrichmentResult with all extracted metadata.
+            EnrichmentResult with the summary and metadata.
         """
         combined_text = f"{title}\n\n{clean_text}" if title else clean_text
         truncated = combined_text[:MAX_LLM_INPUT_CHARS]
@@ -126,22 +149,25 @@ class Enricher:
         result = self._rule_based_classify(clean_text, title)
         result.confidence_score = 0.5
 
+        want_hindi = country in HINDI_COUNTRIES
+
         # Generate Summary if enabled
         if self._settings.enable_llm:
-            summary_data = await self._llm_summarize(truncated)
+            summary_data = await self._llm_summarize(truncated, want_hindi=want_hindi)
             if summary_data:
                 # Store full JSON in summary, but also extract Hindi and metadata for dedicated fields
                 result.summary = json.dumps(summary_data)
                 result.summary_hindi = summary_data.get("quick_take_hindi", "")
                 result.image_search_query = summary_data.get("image_search_query", "")
-                result.impact_tier = summary_data.get("impact_tier", "Medium")
-                result.affected_audience = summary_data.get("affected_audience", [])
-                
+
+                impact = summary_data.get("impact_tier", "Medium")
+                result.impact_tier = impact if impact in IMPACT_TIERS else "Medium"
+
                 # Override rule-based primary category if LLM provided a valid one
-                llm_cat = summary_data.get("primary_category", "").lower()
+                llm_cat = str(summary_data.get("primary_category", "")).lower()
                 try:
                     if llm_cat:
-                        result.primary_category = NoticeCategory(llm_cat)
+                        result.primary_category = NewsCategory(llm_cat)
                         if result.primary_category not in result.categories:
                             result.categories.append(result.primary_category)
                 except ValueError:
@@ -156,29 +182,24 @@ class Enricher:
                 "key_details": [],
                 "key_details_hindi": [],
                 "impact_tier": "Medium",
-                "affected_audience": [],
                 "primary_category": result.primary_category.value,
-                "action_required": "None"
             })
 
         return result
 
-    async def _llm_summarize(self, text: str) -> dict | None:
+    async def _llm_summarize(self, text: str, want_hindi: bool = False) -> dict | None:
         """
-        Generate a structured summary using LLM.
+        Generate a structured summary using the LLM.
+
         Args:
-            text: Truncated document text.
+            text: Truncated article text.
+            want_hindi: Whether to also request a Hindi translation.
         Returns:
-            Dictionary of summary data, or None if LLM unavailable.
+            Dictionary of summary data, or None if the LLM was unavailable.
         """
         from govnotify.processing.llm_router import get_completion
-        
-        prompt = SUMMARY_PROMPT.format(
-            categories=CATEGORIES_LIST,
-            audiences=AUDIENCES_LIST,
-            impact_tiers=IMPACT_TIERS_LIST,
-            text=text
-        )
+
+        prompt = build_prompt(text, want_hindi)
 
         # Retry loop for robust extraction
         for attempt in range(MAX_SUMMARY_ATTEMPTS):
@@ -276,67 +297,64 @@ class Enricher:
         result = EnrichmentResult()
         combined = f"{title} {text}".lower()
 
-        # Keyword-to-category mapping
-        keyword_map: dict[NoticeCategory, list[str]] = {
-            NoticeCategory.JOBS: [
-                "recruitment", "vacancy", "appointment", "upsc", "ssc",
-                "staff selection", "exam", "selection list", "interview",
+        # Keyword-to-category mapping.
+        #
+        # This replaces a map built entirely from Indian government vocabulary
+        # (yojana, UPSC, CBDT, gazette numbering) that classified almost
+        # nothing correctly once the feed became general world news. Keywords
+        # are deliberately international; the LLM does the real work and this
+        # is the baseline and the LLM-off fallback.
+        keyword_map: dict[NewsCategory, list[str]] = {
+            NewsCategory.WORLD: [
+                "united nations", "diplomatic", "foreign ministry", "border",
+                "treaty", "refugee", "ceasefire", "war", "invasion", "embassy",
+                "sanctions", "summit", "nato",
             ],
-            NoticeCategory.SCHEMES: [
-                "scheme", "yojana", "programme", "program", "subsidy",
-                "benefit", "welfare", "pm-kisan", "pmay", "pmfby",
+            NewsCategory.BUSINESS: [
+                "earnings", "revenue", "profit", "quarterly", "shares", "stock",
+                "market", "economy", "inflation", "trade", "investment",
+                "merger", "acquisition", "startup", "ipo", "central bank",
+                "interest rate", "tariff", "layoffs",
             ],
-            NoticeCategory.TAX: [
-                "tax", "cbdt", "cbic", "customs", "income tax", "gst",
-                "excise", "taxation", "tax notification",
+            NewsCategory.POLITICS: [
+                "election", "parliament", "congress", "senate", "minister",
+                "president", "prime minister", "vote", "campaign", "policy",
+                "legislation", "bill", "court", "ruling", "supreme court",
+                "governor", "referendum",
             ],
-            NoticeCategory.AGRICULTURE: [
-                "agriculture", "crop", "farmer", "msp", "irrigation", "fertilizer", "seeds", "mandi",
+            NewsCategory.TECHNOLOGY: [
+                "artificial intelligence", " ai ", "software", "chip",
+                "semiconductor", "smartphone", "cybersecurity", "data breach",
+                "app", "platform", "algorithm", "cloud", "robotics", "quantum",
             ],
-            NoticeCategory.EDUCATION: [
-                "education", "university", "admission", "examination", "ugc", "nta",
-                "scholarship", "school", "college",
+            NewsCategory.SCIENCE: [
+                "researchers", "study found", "scientists", "nasa", "space",
+                "telescope", "satellite", "physics", "genome", "discovery",
+                "experiment", "spacecraft",
             ],
-            NoticeCategory.HEALTH: [
-                "health", "hospital", "medical", "ayush", "vaccine", "disease",
-                "pharmaceutical", "drug",
+            NewsCategory.HEALTH: [
+                "health", "hospital", "disease", "vaccine", "virus", "patients",
+                "medical", "outbreak", "drug", "clinical trial", "cancer",
+                "mental health", "who",
             ],
-            NoticeCategory.LEGAL: [
-                "law", "act", "bill", "amendment", "ordinance", "regulation",
-                "court", "judicial", "tribunal",
+            NewsCategory.SPORTS: [
+                "match", "tournament", "championship", "league", "cup", "olympic",
+                "cricket", "football", "soccer", "tennis", "basketball",
+                "medal", "coach", "striker", "innings",
             ],
-            NoticeCategory.GAZETTE: [
-                "gazette", "extraordinary", "official gazette", "notification no", "s.o.", "g.s.r.",
+            NewsCategory.ENTERTAINMENT: [
+                "film", "movie", "album", "actor", "actress", "box office",
+                "series", "streaming", "concert", "festival", "celebrity",
+                "director", "netflix",
             ],
-            NoticeCategory.FINANCE: [
-                "rbi", "reserve bank", "interest rate", "monetary policy", "finance", "sebi", "mutual fund",
+            NewsCategory.ENVIRONMENT: [
+                "climate", "emissions", "wildfire", "flood", "drought",
+                "pollution", "renewable", "biodiversity", "conservation",
+                "earthquake", "hurricane", "cyclone", "wildlife",
             ],
-            NoticeCategory.INFRASTRUCTURE: [
-                "infrastructure", "bridge", "construction", "smart city", "housing", "road",
-                "highway", "railway", "metro",
-            ],
-            NoticeCategory.DEFENSE: [
-                "military", "defense", "defence", "cantonment", "army", "navy", "air force",
-            ],
-            NoticeCategory.ENVIRONMENT: [
-                "environment", "environmental clearance", "pollution", "forest", "wildlife",
-                "climate", "green tribunal",
-            ],
-            NoticeCategory.TECHNOLOGY: [
-                "technology", "it policy", "cybersecurity", "digital india", "software",
-                "semiconductor", "electronics", "telecom", "5g", "ai",
-            ],
-            NoticeCategory.WOMEN_CHILD: [
-                "women", "child", "maternity", "girl child", "anganwadi", "icds",
-                "poshan", "safety of women",
-            ],
-            NoticeCategory.SOCIAL_WELFARE: [
-                "welfare", "pension", "disability", "divyangjan", "tribal", "sc/st",
-                "minority", "social justice", "empowerment",
-            ],
-            NoticeCategory.LOCAL_GOVERNANCE: [
-                "municipal", "panchayat", "local body", "urban local", "smart city",
-                "cleanliness survey", "swachh bharat",
+            NewsCategory.EDUCATION: [
+                "school", "university", "student", "exam", "curriculum",
+                "teacher", "tuition", "scholarship", "campus", "admission",
             ],
         }
 
@@ -349,8 +367,8 @@ class Enricher:
             result.categories = matched_categories
             result.primary_category = matched_categories[0]
         else:
-            result.categories = [NoticeCategory.OTHER]
-            result.primary_category = NoticeCategory.OTHER
+            result.categories = [NewsCategory.OTHER]
+            result.primary_category = NewsCategory.OTHER
 
         return result
 

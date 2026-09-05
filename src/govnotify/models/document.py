@@ -31,6 +31,7 @@ class ProcessedDocument(BaseModel):
     regions: list[str] = Field(default_factory=list, description="Relevant states/regions")
     departments: list[str] = Field(default_factory=list, description="Issuing departments")
     impact_tier: str = Field(default="Medium", description="Critical/High/Medium/Low")
+    country: str = Field(default="world", description="Feed scope: world, in, us")
     affected_audience: list[str] = Field(default_factory=list, description="Target groups")
 
     # Extracted entities

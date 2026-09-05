@@ -1,117 +1,160 @@
 """
-Centralized constants for GovNotify.
+Centralized constants.
 Ensures consistency across ingestion, processing, API, and frontend.
 """
 import datetime
-from enum import Enum
 from datetime import timezone
+from enum import Enum
 
 
-class NoticeCategory(str, Enum):
-    """Categories for government notices."""
-    JOBS = "jobs"
-    SCHEMES = "schemes"
-    TAX = "tax"
-    AGRICULTURE = "agriculture"
-    EDUCATION = "education"
-    HEALTH = "health"
-    LEGAL = "legal"
-    GAZETTE = "gazette"
-    FINANCE = "finance"
-    INFRASTRUCTURE = "infrastructure"
-    ENVIRONMENT = "environment"
-    DEFENSE = "defense"
+class NewsCategory(str, Enum):
+    """Topic categories for general news."""
+    WORLD = "world"
+    BUSINESS = "business"
+    POLITICS = "politics"
     TECHNOLOGY = "technology"
-    LOCAL_GOVERNANCE = "local_governance"
-    WOMEN_CHILD = "women_child"
-    SOCIAL_WELFARE = "social_welfare"
+    SCIENCE = "science"
+    HEALTH = "health"
+    SPORTS = "sports"
+    ENTERTAINMENT = "entertainment"
+    ENVIRONMENT = "environment"
+    EDUCATION = "education"
     OTHER = "other"
 
 
-# Master list of Audiences (used by LLM and Frontend)
-AUDIENCES = [
-    "Retail Investors",
-    "Farmers",
-    "MSMEs",
-    "Students",
-    "Corporate Legal",
-    "Tax Professionals",
-    "Chartered Accountants",
-    "Bankers",
-    "Insurance Professionals",
-    "Insolvency Professionals",
-    "Fintech Entities",
-    "Healthcare Providers",
-    "Exporters",
-    "Tech Professionals"
+# The taxonomy used to be government-notice shaped (jobs, schemes, gazette,
+# tax, local_governance and so on). Documents ingested under it are still in
+# the database, so map the old values onto the closest news category when one
+# is read back. Anything unmapped falls through to OTHER.
+LEGACY_CATEGORY_MAP = {
+    "jobs": NewsCategory.BUSINESS,
+    "schemes": NewsCategory.POLITICS,
+    "tax": NewsCategory.BUSINESS,
+    "finance": NewsCategory.BUSINESS,
+    "agriculture": NewsCategory.BUSINESS,
+    "infrastructure": NewsCategory.BUSINESS,
+    "legal": NewsCategory.POLITICS,
+    "gazette": NewsCategory.POLITICS,
+    "defense": NewsCategory.POLITICS,
+    "local_governance": NewsCategory.POLITICS,
+    "social_welfare": NewsCategory.POLITICS,
+    "women_child": NewsCategory.POLITICS,
+    "education": NewsCategory.EDUCATION,
+    "health": NewsCategory.HEALTH,
+    "technology": NewsCategory.TECHNOLOGY,
+    "environment": NewsCategory.ENVIRONMENT,
+    "other": NewsCategory.OTHER,
+}
+
+
+def parse_category(value: str | None) -> NewsCategory:
+    """
+    Read a stored category, tolerating values from the old taxonomy.
+
+    Never raises: an unrecognised value becomes OTHER rather than failing the
+    request, because historical rows predate this enum.
+    """
+    if not value:
+        return NewsCategory.OTHER
+    try:
+        return NewsCategory(value)
+    except ValueError:
+        return LEGACY_CATEGORY_MAP.get(value, NewsCategory.OTHER)
+
+
+# Backwards-compatible alias: plenty of modules still import NoticeCategory.
+NoticeCategory = NewsCategory
+
+
+class Country(str, Enum):
+    """
+    Feed scopes a reader can choose between.
+
+    WORLD is not a country: it is international coverage from global outlets,
+    and it is the sensible default for a reader whose own country is not yet
+    supported.
+    """
+    WORLD = "world"
+    INDIA = "in"
+    UNITED_STATES = "us"
+
+
+COUNTRIES = [
+    {"code": Country.WORLD.value, "name": "World", "flag": "\U0001F30D", "language": "en"},
+    {"code": Country.INDIA.value, "name": "India", "flag": "\U0001F1EE\U0001F1F3", "language": "en"},
+    {"code": Country.UNITED_STATES.value, "name": "United States", "flag": "\U0001F1FA\U0001F1F8", "language": "en"},
 ]
 
-# Master list of Impact Tiers
+DEFAULT_COUNTRY = Country.WORLD.value
+
+# Countries whose readers are offered a Hindi translation. Generating Hindi for
+# every article doubles the LLM output tokens, and the free Gemini tier is the
+# binding constraint, so it is produced only where it is actually read.
+HINDI_COUNTRIES = frozenset({Country.INDIA.value})
+
+
+def is_valid_country(code: str | None) -> bool:
+    return bool(code) and code in {c["code"] for c in COUNTRIES}
+
+
+# How prominent a story is. Kept as four tiers so existing rows stay valid,
+# but scored on news significance rather than regulatory impact.
 IMPACT_TIERS = [
     "Critical",
     "High",
     "Medium",
-    "Low"
+    "Low",
 ]
 
-# Hindi translations for Categories
 CATEGORY_NAMES_HI = {
-    "jobs": "नौकरियां",
-    "schemes": "योजनाएं",
-    "tax": "कर (Tax)",
-    "agriculture": "कृषि",
-    "education": "शिक्षा",
-    "health": "स्वास्थ्य",
-    "legal": "कानूनी",
-    "gazette": "राजपत्र (Gazette)",
-    "finance": "वित्त",
-    "infrastructure": "बुनियादी ढांचा",
-    "environment": "पर्यावरण",
-    "defense": "रक्षा",
-    "local_governance": "स्थानीय शासन",
+    "world": "विश्व",
+    "business": "व्यापार",
+    "politics": "राजनीति",
     "technology": "प्रौद्योगिकी",
-    "women_child": "महिला एवं बाल",
-    "social_welfare": "समाज कल्याण",
+    "science": "विज्ञान",
+    "health": "स्वास्थ्य",
+    "sports": "खेल",
+    "entertainment": "मनोरंजन",
+    "environment": "पर्यावरण",
+    "education": "शिक्षा",
     "other": "अन्य",
 }
 
-# Category Emojis
 CATEGORY_EMOJIS = {
-    "jobs": "💼",
-    "schemes": "📜",
-    "tax": "💰",
-    "agriculture": "🌾",
-    "education": "🎓",
-    "health": "🏥",
-    "legal": "⚖️",
-    "gazette": "🗞️",
-    "finance": "🏦",
-    "infrastructure": "🏗️",
-    "environment": "🌱",
-    "defense": "🛡️",
-    "local_governance": "🏘️",
-    "technology": "💻",
-    "women_child": "👩‍👧",
-    "social_welfare": "🤝",
-    "other": "🔗",
+    "world": "\U0001F30D",
+    "business": "\U0001F4C8",
+    "politics": "\U0001F3DB",
+    "technology": "\U0001F4BB",
+    "science": "\U0001F52C",
+    "health": "\U0001F3E5",
+    "sports": "\U000026BD",
+    "entertainment": "\U0001F3AC",
+    "environment": "\U0001F331",
+    "education": "\U0001F393",
+    "other": "\U0001F517",
 }
 
-# Human-readable names for sources
+# Human-readable names for sources. Source ids are <slug>_<country>.
 SOURCE_NAMES = {
+    # World
+    "bbc_world": "BBC News",
+    "aljazeera_world": "Al Jazeera",
+    "guardian_world": "The Guardian",
+    "npr_world": "NPR",
+    # India
+    "toi_in": "Times of India",
+    "thehindu_in": "The Hindu",
+    "ndtv_in": "NDTV",
+    "indianexpress_in": "Indian Express",
     "et_top_stories": "Economic Times",
     "mint_top_stories": "Mint",
     "bs_top_stories": "Business Standard",
-    "sebi_news": "SEBI",
-    "rbi_press_releases": "RBI Press Releases",
-    "rbi_circulars": "RBI Circulars",
-    "pib_press_releases": "PIB",
-    "income_tax": "Income Tax Department",
-    "mha_updates": "Ministry of Home Affairs",
-    "meity_updates": "MeitY",
-    "irdai_updates": "IRDAI",
-    "ibbi_updates": "IBBI",
-    "mca_updates": "MCA",
-    "egazette_central": "e-Gazette Central",
+    # United States
+    "npr_us": "NPR",
+    "cbs_us": "CBS News",
+    "nbc_us": "NBC News",
+    "abc_us": "ABC News",
+    "thehill_us": "The Hill",
 }
 
 
