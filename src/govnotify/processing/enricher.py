@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
 
 import structlog
 
@@ -24,6 +23,19 @@ AUDIENCES_LIST = ", ".join(AUDIENCES)
 
 # List of valid impact tiers
 IMPACT_TIERS_LIST = ", ".join(IMPACT_TIERS)
+
+# How much article text to send to the LLM.
+#
+# This was 50,000 characters, roughly 12,500 tokens per article, which
+# dominated inference cost and latency. News articles put their substance in
+# the opening paragraphs, so 8,000 characters covers the full body of all but
+# the longest features while cutting the per-article token bill by about 84%.
+MAX_LLM_INPUT_CHARS = 8000
+
+# Attempts to coax valid JSON out of the model. The router underneath applies
+# its own retries and fallback chain, so keeping this low avoids multiplying
+# one failure into a long series of calls.
+MAX_SUMMARY_ATTEMPTS = 2
 
 SUMMARY_PROMPT = """
 You are an expert news and notices summarizer.
@@ -108,8 +120,7 @@ class Enricher:
             EnrichmentResult with all extracted metadata.
         """
         combined_text = f"{title}\n\n{clean_text}" if title else clean_text
-        # Increase limit to capture most documents fully while staying within safety bounds
-        truncated = combined_text[:50000]
+        truncated = combined_text[:MAX_LLM_INPUT_CHARS]
 
         # Use rule-based classification as a baseline
         result = self._rule_based_classify(clean_text, title)
@@ -170,7 +181,7 @@ class Enricher:
         )
 
         # Retry loop for robust extraction
-        for attempt in range(3):
+        for attempt in range(MAX_SUMMARY_ATTEMPTS):
             try:
                 content = await get_completion(
                     messages=[{"role": "user", "content": prompt}],
@@ -197,7 +208,7 @@ class Enricher:
                 logger.warning("llm_response_missing_keys", keys=list(data.keys()), attempt=attempt+1)
             except Exception as exc:
                 logger.warning("llm_summarize_attempt_failed", attempt=attempt+1, error=str(exc))
-                if attempt == 2:
+                if attempt == MAX_SUMMARY_ATTEMPTS - 1:
                     break
         
         return None
@@ -246,6 +257,10 @@ class Enricher:
                         return content[start_idx : i + 1]
 
         return None
+
+    def classify(self, text: str, title: str = "") -> EnrichmentResult:
+        """Rule-based classification, used as a baseline and as the LLM-off path."""
+        return self._rule_based_classify(text, title)
 
     def _rule_based_classify(
         self, text: str, title: str = ""

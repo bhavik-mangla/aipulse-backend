@@ -3,6 +3,8 @@ Application configuration via pydantic-settings.
 This is the single source of truth for configuration across the app.
 All settings are loaded from environment variables (or .env file).
 """
+from functools import lru_cache
+
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -32,12 +34,6 @@ class Settings(BaseSettings):
     db_password: str = "change-me"
     database_url: str = "postgresql+asyncpg://govnotify:change-me@postgres:5432/govnotify"
 
-    # --- Qdrant ---
-    qdrant_host: str = "qdrant"
-    qdrant_port: int = 6333
-    qdrant_grpc_port: int = 6334
-    qdrant_collection: str = "govnotify_chunks"
-
     # --- Redis ---
     redis_url: str = "redis://redis:6379/0"
     celery_broker_url: str = "redis://redis:6379/1"
@@ -49,22 +45,10 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""
     enable_llm: bool = True
 
-    # --- Embedding Model ---
-    embedding_model: str = "BAAI/bge-m3"
-    embedding_device: str = "cpu"
-    reranker_model: str = "BAAI/bge-reranker-v2-m3"
-
     # --- Crawling ---
     crawl_user_agent: str = "GovNotify/1.0 (government notification aggregator)"
     crawl_default_rate_limit_rpm: int = 30
     crawl_respect_robots_txt: bool = True
-
-    # --- RAG ---
-    rag_top_k_retrieval: int = 50
-    rag_top_k_rerank: int = 10
-    rag_chunk_size: int = 512
-    rag_chunk_overlap: int = 64
-    rag_similarity_threshold: float = 0.3
 
     @property
     def is_production(self) -> bool:
@@ -82,6 +66,14 @@ class Settings(BaseSettings):
         return self.app_env == "testing"
 
 
+@lru_cache(maxsize=1)
 def get_settings() -> Settings:
-    """Create and return application settings singleton."""
+    """
+    Return the application settings singleton.
+
+    Cached: this is called from request handlers, the ingestion pipeline and
+    every processing component, and each uncached call re-read and re-validated
+    the environment and .env file. The docstring already claimed it was a
+    singleton; now it is one.
+    """
     return Settings()

@@ -4,22 +4,30 @@ Provides the main news feed, search, and individual document details.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date as date_type
+from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Response
-from pydantic import BaseModel, Field
-from sqlalchemy import select, func, or_, and_, desc
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from pydantic import BaseModel
+from sqlalchemy import Select, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from govnotify.api.deps import get_db
-from govnotify.constants import NoticeCategory, HIDE_BEFORE_DATETIME, get_source_name
-from govnotify.storage.postgres import DocumentORM
+from govnotify.constants import HIDE_BEFORE_DATETIME, NoticeCategory, get_source_name
 from govnotify.models.document import ProcessedDocument
+from govnotify.storage.postgres import DocumentORM
 
 logger = structlog.get_logger(__name__)
 router = APIRouter()
+
+# The mobile app asks for 15 but benefits from a wider window, because it
+# filters out stories the reader has already seen and would otherwise show a
+# near-empty screen. The response reports the size actually applied so clients
+# can detect the end of the feed correctly.
+MOBILE_PAGE_SIZE = 15
+MOBILE_EFFECTIVE_PAGE_SIZE = 60
 
 
 # Response schemas
@@ -46,7 +54,8 @@ class FeedItem(BaseModel):
 
 class FeedResponse(BaseModel):
     items: list[FeedItem]
-    total: int
+    # None when the caller opted out of the count with include_total=false.
+    total: Optional[int] = None
     page: int
     page_size: int
 
@@ -54,7 +63,7 @@ class FeedResponse(BaseModel):
 # Helpers
 
 def map_orm_to_feed_item(doc: DocumentORM) -> FeedItem:
-    """Map DocumentORM to FeedItem Pydantic model."""
+    """Map DocumentORM to FeedItem."""
     return FeedItem(
         id=doc.id,
         source_id=doc.source_id,
@@ -67,8 +76,104 @@ def map_orm_to_feed_item(doc: DocumentORM) -> FeedItem:
         category=doc.primary_category or "other",
         impact_level=(doc.impact_tier or "Medium").lower(),
         affected_audience=doc.affected_audience or [],
-        published_at=doc.ingested_at,  # Using ingested_at as published_at for now
-        created_at=doc.ingested_at or datetime.utcnow(),
+        # Fall back to ingest time for documents stored before publication
+        # dates were captured.
+        published_at=doc.published_at or doc.ingested_at,
+        created_at=doc.ingested_at or datetime.now(timezone.utc),
+    )
+
+
+def resolve_page_size(requested: int) -> int:
+    """Widen the mobile app's page request; see MOBILE_EFFECTIVE_PAGE_SIZE."""
+    return MOBILE_EFFECTIVE_PAGE_SIZE if requested == MOBILE_PAGE_SIZE else requested
+
+
+def build_feed_query(
+    *,
+    feed_type: str = "all",
+    category: Optional[str] = None,
+    source_id: Optional[str] = None,
+    audience: Optional[str] = None,
+    impact_level: Optional[str] = None,
+    on_date: Optional[date_type] = None,
+    search: Optional[str] = None,
+) -> Select:
+    """
+    Build the filtered document query shared by the feed and search endpoints.
+
+    Both endpoints previously repeated this block verbatim, which is how the
+    date filter came to be accepted by the app but implemented by neither.
+    """
+    stmt = select(DocumentORM).where(
+        DocumentORM.is_duplicate.is_(False),
+        DocumentORM.ingested_at >= HIDE_BEFORE_DATETIME,
+    )
+
+    if category:
+        stmt = stmt.where(DocumentORM.primary_category == category)
+
+    if source_id:
+        stmt = stmt.where(DocumentORM.source_id == source_id)
+
+    if audience:
+        stmt = stmt.where(DocumentORM.affected_audience.contains([audience]))
+
+    if impact_level == "high_only":
+        stmt = stmt.where(DocumentORM.impact_tier.in_(["Critical", "High"]))
+
+    if feed_type == "news":
+        stmt = stmt.where(DocumentORM.source_id.contains("top_stories"))
+    elif feed_type == "official":
+        stmt = stmt.where(~DocumentORM.source_id.contains("top_stories"))
+
+    if on_date:
+        # Half-open range over the calendar day so the index on the timestamp
+        # is still usable, unlike a cast to date.
+        start = datetime.combine(on_date, time.min, tzinfo=timezone.utc)
+        stmt = stmt.where(
+            DocumentORM.ingested_at >= start,
+            DocumentORM.ingested_at < start + timedelta(days=1),
+        )
+
+    if search:
+        pattern = f"%{search}%"
+        stmt = stmt.where(
+            or_(
+                DocumentORM.title.ilike(pattern),
+                DocumentORM.summary.ilike(pattern),
+                DocumentORM.clean_text.ilike(pattern),
+            )
+        )
+
+    return stmt
+
+
+async def run_feed_query(
+    db: AsyncSession,
+    stmt: Select,
+    page: int,
+    page_size: int,
+    include_total: bool,
+) -> FeedResponse:
+    """Count (optionally), paginate and map a feed query."""
+    total = None
+    if include_total:
+        total = (await db.execute(
+            select(func.count()).select_from(stmt.subquery())
+        )).scalar() or 0
+
+    stmt = (
+        stmt.order_by(desc(DocumentORM.ingested_at))
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+    )
+    docs = (await db.execute(stmt)).scalars().all()
+
+    return FeedResponse(
+        items=[map_orm_to_feed_item(doc) for doc in docs],
+        total=total,
+        page=page,
+        page_size=page_size,
     )
 
 
@@ -78,65 +183,28 @@ def map_orm_to_feed_item(doc: DocumentORM) -> FeedItem:
 async def get_latest(
     response: Response,
     page: int = Query(1, ge=1),
-    page_size: int = Query(15, ge=1, le=100),
-    feed_type: str = Query("all"),  # news, official, all
+    page_size: int = Query(MOBILE_PAGE_SIZE, ge=1, le=100),
+    feed_type: str = Query("all", description="news | official | all"),
     category: Optional[str] = None,
     source_id: Optional[str] = None,
     audience: Optional[str] = None,
     impact_level: Optional[str] = None,
+    date: Optional[date_type] = Query(None, description="Restrict to one day (YYYY-MM-DD)"),
+    include_total: bool = Query(True, description="Set false to skip the count query"),
     db: AsyncSession = Depends(get_db),
 ):
     """Get the latest documents with filtering and pagination."""
     response.headers["Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=300"
-    
-    # MOBILE APP HACK: If app asks for 15, we give it 60 to help find unread news deeper
-    effective_size = page_size
-    if page_size == 15:
-        effective_size = 60
 
-    stmt = select(DocumentORM).where(
-        DocumentORM.is_duplicate == False,
-        DocumentORM.ingested_at >= HIDE_BEFORE_DATETIME
+    stmt = build_feed_query(
+        feed_type=feed_type,
+        category=category,
+        source_id=source_id,
+        audience=audience,
+        impact_level=impact_level,
+        on_date=date,
     )
-
-    # Apply filters
-    if category:
-        stmt = stmt.where(DocumentORM.primary_category == category)
-    
-    if source_id:
-        stmt = stmt.where(DocumentORM.source_id == source_id)
-    
-    if audience:
-        stmt = stmt.where(DocumentORM.affected_audience.contains([audience]))
-    
-    if impact_level == "high_only":
-        stmt = stmt.where(DocumentORM.impact_tier.in_(["Critical", "High"]))
-
-    if feed_type == "news":
-        stmt = stmt.where(DocumentORM.source_id.contains("top_stories"))
-    elif feed_type == "official":
-        stmt = stmt.where(~DocumentORM.source_id.contains("top_stories"))
-
-    # Count total
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total_res = await db.execute(count_stmt)
-    total = total_res.scalar() or 0
-
-    # Paginate
-    stmt = stmt.order_by(desc(DocumentORM.ingested_at))
-    stmt = stmt.offset((page - 1) * effective_size).limit(effective_size)
-    
-    result = await db.execute(stmt)
-    docs = result.scalars().all()
-
-    items = [map_orm_to_feed_item(doc) for doc in docs]
-    
-    return FeedResponse(
-        items=items,
-        total=total,
-        page=page,
-        page_size=effective_size
-    )
+    return await run_feed_query(db, stmt, page, resolve_page_size(page_size), include_total)
 
 
 @router.get("/search", response_model=FeedResponse)
@@ -144,59 +212,29 @@ async def search(
     response: Response,
     q: str = Query(..., min_length=1),
     page: int = Query(1, ge=1),
-    page_size: int = Query(15, ge=1, le=100),
+    page_size: int = Query(MOBILE_PAGE_SIZE, ge=1, le=100),
     feed_type: str = Query("all"),
     category: Optional[str] = None,
+    source_id: Optional[str] = None,
+    audience: Optional[str] = None,
+    impact_level: Optional[str] = None,
+    date: Optional[date_type] = Query(None, description="Restrict to one day (YYYY-MM-DD)"),
+    include_total: bool = Query(True, description="Set false to skip the count query"),
     db: AsyncSession = Depends(get_db),
 ):
-    """Search documents by title or summary."""
+    """Search documents by title, summary or body text."""
     response.headers["Cache-Control"] = "public, s-maxage=60, stale-while-revalidate=300"
-    
-    # MOBILE APP HACK: If app asks for 15, we give it 60 to help find unread news deeper
-    effective_size = page_size
-    if page_size == 15:
-        effective_size = 60
 
-    search_filter = or_(
-        DocumentORM.title.ilike(f"%{q}%"),
-        DocumentORM.summary.ilike(f"%{q}%"),
-        DocumentORM.clean_text.ilike(f"%{q}%")
+    stmt = build_feed_query(
+        feed_type=feed_type,
+        category=category,
+        source_id=source_id,
+        audience=audience,
+        impact_level=impact_level,
+        on_date=date,
+        search=q,
     )
-    
-    stmt = select(DocumentORM).where(
-        DocumentORM.is_duplicate == False,
-        DocumentORM.ingested_at >= HIDE_BEFORE_DATETIME,
-        search_filter
-    )
-
-    if category:
-        stmt = stmt.where(DocumentORM.primary_category == category)
-
-    if feed_type == "news":
-        stmt = stmt.where(DocumentORM.source_id.contains("top_stories"))
-    elif feed_type == "official":
-        stmt = stmt.where(~DocumentORM.source_id.contains("top_stories"))
-
-    # Count total
-    count_stmt = select(func.count()).select_from(stmt.subquery())
-    total_res = await db.execute(count_stmt)
-    total = total_res.scalar() or 0
-
-    # Paginate
-    stmt = stmt.order_by(desc(DocumentORM.ingested_at))
-    stmt = stmt.offset((page - 1) * effective_size).limit(effective_size)
-    
-    result = await db.execute(stmt)
-    docs = result.scalars().all()
-
-    items = [map_orm_to_feed_item(doc) for doc in docs]
-    
-    return FeedResponse(
-        items=items,
-        total=total,
-        page=page,
-        page_size=effective_size
-    )
+    return await run_feed_query(db, stmt, page, resolve_page_size(page_size), include_total)
 
 
 @router.get("/{document_id}", response_model=ProcessedDocument)
@@ -211,10 +249,9 @@ async def get_document(
     if not doc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Document not found"
+            detail="Document not found",
         )
-    
-    # Return as ProcessedDocument
+
     return ProcessedDocument(
         id=doc.id,
         source_id=doc.source_id,
@@ -227,7 +264,9 @@ async def get_document(
         image_url=doc.image_url,
         image_search_query=doc.image_search_query,
         categories=doc.categories or [],
-        primary_category=NoticeCategory(doc.primary_category) if doc.primary_category else NoticeCategory.OTHER,
+        primary_category=(
+            NoticeCategory(doc.primary_category) if doc.primary_category else NoticeCategory.OTHER
+        ),
         regions=doc.regions or [],
         departments=doc.departments or [],
         impact_tier=doc.impact_tier or "Medium",
@@ -235,11 +274,11 @@ async def get_document(
         entities=doc.entities or {},
         notification_number=doc.notification_number,
         ingested_at=doc.ingested_at,
-        processed_at=doc.ingested_at or datetime.utcnow(), # fallback
+        processed_at=doc.ingested_at or datetime.now(timezone.utc),
         language=doc.language or "en",
         content_hash=doc.content_hash,
         simhash=doc.simhash,
         is_duplicate=doc.is_duplicate,
         duplicate_of=doc.duplicate_of,
-        confidence_score=doc.confidence_score or 0.0
+        confidence_score=doc.confidence_score or 0.0,
     )

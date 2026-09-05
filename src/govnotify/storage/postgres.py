@@ -5,7 +5,6 @@ Uses async SQLAlchemy with asyncpg driver.
 """
 from __future__ import annotations
 
-from datetime import datetime
 from uuid import uuid4
 
 from sqlalchemy import (
@@ -18,7 +17,6 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
-    UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -97,6 +95,10 @@ class DocumentORM(Base):
     ingested_at = Column(
         DateTime(timezone=True), default=get_utc_now, index=True
     )
+    # When the outlet published the story, as opposed to when we ingested it.
+    # Nullable: documents stored before this was captured have no value, and
+    # readers fall back to ingested_at.
+    published_at = Column(DateTime(timezone=True), nullable=True, index=True)
     language = Column(String(10), default="en")
     content_hash = Column(String(64), nullable=False, index=True)
     simhash = Column(String(64), nullable=True)
@@ -110,6 +112,15 @@ class DocumentORM(Base):
     __table_args__ = (
         Index("idx_documents_categories", "categories", postgresql_using="gin"),
         Index("idx_documents_regions", "regions", postgresql_using="gin"),
+        # Every feed request filters on is_duplicate and orders by ingested_at
+        # descending; this covers that access path directly.
+        Index(
+            "idx_documents_feed",
+            "is_duplicate",
+            ingested_at.desc(),
+        ),
+        # Near-duplicate lookups load a recent window by simhash.
+        Index("idx_documents_simhash", "simhash"),
     )
 
 
