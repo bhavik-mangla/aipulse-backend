@@ -16,33 +16,7 @@ services:
     restart: unless-stopped
 
   # Celery Workers
-  celery-worker:
-    build: .
-    command: celery -A govnotify.tasks.celery_app worker --loglevel=info --concurrency=1
-    shm_size: '2gb'
-    depends_on:
-      - postgres
-      - redis
-    volumes:
-      - .:/app
-    env_file: .env
-    environment:
-      PYTHONPATH: /app/src
-    restart: unless-stopped
-
   # Celery Beat (Scheduler)
-  celery-beat:
-    build: .
-    command: celery -A govnotify.tasks.celery_app beat --loglevel=info
-    depends_on:
-      - redis
-    volumes:
-      - .:/app
-    env_file: .env
-    environment:
-      PYTHONPATH: /app/src
-    restart: unless-stopped
-
   # Databases
   postgres:
     image: postgres:16-alpine
@@ -90,17 +64,6 @@ services:
     restart: unless-stopped
 
   # Monitoring
-  flower:
-    build: .
-    command: celery -A govnotify.tasks.celery_app flower --port=5555
-    # Flower can be exposed directly or proxied. For now keeping it private.
-    env_file: .env
-    depends_on:
-      - redis
-    volumes:
-      - .:/app
-    restart: unless-stopped
-
 volumes:
   postgres_data:
   redis_data:

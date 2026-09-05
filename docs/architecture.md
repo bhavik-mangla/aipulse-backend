@@ -129,7 +129,5 @@ was dropped.
 ## Known rough edges
 
 - The Python package is still named `govnotify`.
-- `src/govnotify/tasks/` holds a Celery setup that is unreachable in the
-  production path but still referenced by `docker-compose.yml` for self-hosting.
 - `documents.summary_hindi` and `documents.affected_audience` are retained but
   no longer written, so historical rows stay readable.
