@@ -127,26 +127,39 @@ class TextParser:
 
     def detect_language(self, text: str) -> str:
         """
-        Detect the language of the given text using lingua-py.
-        Args:
-            text: Text to analyze.
-        Returns:
-            ISO 639-1 language code (e.g. 'en', 'hi').
+        Detect the language of a body of text as an ISO 639-1 code.
+
+        Every source we carry publishes in English, so this almost always
+        returns "en". It stays because the field is stored per document and a
+        contributor adding a non-English outlet should not have to touch the
+        pipeline to get it labelled correctly.
         """
         if not text or len(text) < 20:
             return "en"
         try:
             from lingua import Language, LanguageDetectorBuilder
-            # Lazily initialize detector if not present
+
             if not hasattr(self, "_lang_detector"):
+                # A deliberately small candidate set: loading every language
+                # costs seconds of startup per run for a field that is "en"
+                # almost every time. Add a language here when adding a source
+                # that publishes in it.
                 self._lang_detector = (
-                    LanguageDetectorBuilder.from_languages(Language.ENGLISH, Language.HINDI)
+                    LanguageDetectorBuilder.from_languages(
+                        Language.ENGLISH,
+                        Language.FRENCH,
+                        Language.GERMAN,
+                        Language.SPANISH,
+                        Language.PORTUGUESE,
+                    )
+                    .with_low_accuracy_mode()
                     .build()
                 )
-            
+
             detected = self._lang_detector.detect_language_of(text)
-            if detected == Language.HINDI:
-                return "hi"
-            return "en"
+            if detected is None:
+                return "en"
+            return detected.iso_code_639_1.name.lower()
         except Exception:
+            # Detection is advisory; never fail ingestion over it.
             return "en"

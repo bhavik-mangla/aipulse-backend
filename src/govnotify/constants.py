@@ -87,12 +87,6 @@ COUNTRIES = [
 
 DEFAULT_COUNTRY = Country.WORLD.value
 
-# Countries whose readers are offered a Hindi translation. Generating Hindi for
-# every article doubles the LLM output tokens, and the free Gemini tier is the
-# binding constraint, so it is produced only where it is actually read.
-HINDI_COUNTRIES = frozenset({Country.INDIA.value})
-
-
 def is_valid_country(code: str | None) -> bool:
     return bool(code) and code in {c["code"] for c in COUNTRIES}
 
@@ -106,19 +100,33 @@ IMPACT_TIERS = [
     "Low",
 ]
 
-CATEGORY_NAMES_HI = {
-    "world": "विश्व",
-    "business": "व्यापार",
-    "politics": "राजनीति",
-    "technology": "प्रौद्योगिकी",
-    "science": "विज्ञान",
-    "health": "स्वास्थ्य",
-    "sports": "खेल",
-    "entertainment": "मनोरंजन",
-    "environment": "पर्यावरण",
-    "education": "शिक्षा",
-    "other": "अन्य",
+# Localised category names.
+#
+# Summaries and UI strings are English-only for now. Hindi translation was
+# removed and preserved on the archive/hindi-localisation branch: it doubled
+# LLM output tokens for every article, and doing translation properly means
+# handling several languages rather than special-casing one.
+#
+# To add a language, add its code here and to the app's I18N table. Nothing
+# else in the pipeline is language-specific.
+CATEGORY_NAMES = {
+    "en": {
+        "world": "World",
+        "business": "Business",
+        "politics": "Politics",
+        "technology": "Technology",
+        "science": "Science",
+        "health": "Health",
+        "sports": "Sports",
+        "entertainment": "Entertainment",
+        "environment": "Environment",
+        "education": "Education",
+        "other": "Other",
+    },
 }
+
+SUPPORTED_LANGUAGES = list(CATEGORY_NAMES)
+DEFAULT_LANGUAGE = "en"
 
 CATEGORY_EMOJIS = {
     "world": "\U0001F30D",

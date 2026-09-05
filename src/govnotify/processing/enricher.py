@@ -11,7 +11,7 @@ import re
 import structlog
 
 from govnotify.config import get_settings
-from govnotify.constants import HINDI_COUNTRIES, IMPACT_TIERS, NewsCategory
+from govnotify.constants import IMPACT_TIERS, NewsCategory
 
 logger = structlog.get_logger(__name__)
 
@@ -61,41 +61,28 @@ Guidelines:
   figures, quotes or outcomes.
 - No editorialising and no opinion of your own.
 - Use only values from the provided lists for Category and Impact Tier.
-{language_instruction}
+
 Input text:
 {text}
 
 Respond with ONLY valid JSON:
 {{
-  "quick_take": "A 1-2 sentence summary of what happened.",{hindi_take_field}
+  "quick_take": "A 1-2 sentence summary of what happened.",
   "key_details": [
     "Specific fact or figure the quick take did not cover"
-  ],{hindi_details_field}
+  ],
   "impact_tier": "Critical/High/Medium/Low",
   "primary_category": "category_name",
   "image_search_query": "concrete entity from the story"
 }}
 """
 
-# Hindi is generated only for scopes whose readers are offered it. Producing it
-# for every article roughly doubles output tokens, and the free Gemini tier is
-# the binding constraint on how many sources we can run.
-HINDI_INSTRUCTION = (
-    "- Also provide a natural, professional Hindi translation of the quick "
-    "take and the key details.\n"
-)
-HINDI_TAKE_FIELD = '\n  "quick_take_hindi": "\u0939\u093f\u0902\u0926\u0940 \u092e\u0947\u0902 \u0938\u093e\u0930\u093e\u0902\u0936\u0964",'
-HINDI_DETAILS_FIELD = '\n  "key_details_hindi": ["\u0939\u093f\u0902\u0926\u0940 \u092e\u0947\u0902 \u092e\u0939\u0924\u094d\u0935\u092a\u0942\u0930\u094d\u0923 \u0924\u0925\u094d\u092f"],'
 
-
-def build_prompt(text: str, want_hindi: bool) -> str:
-    """Render the summary prompt, including Hindi fields only when wanted."""
+def build_prompt(text: str) -> str:
+    """Render the summary prompt for an article."""
     return SUMMARY_PROMPT.format(
         categories=CATEGORIES_LIST,
         impact_tiers=IMPACT_TIERS_LIST,
-        language_instruction=HINDI_INSTRUCTION if want_hindi else "",
-        hindi_take_field=HINDI_TAKE_FIELD if want_hindi else "",
-        hindi_details_field=HINDI_DETAILS_FIELD if want_hindi else "",
         text=text,
     )
 
@@ -116,8 +103,7 @@ class EnrichmentResult:
             "amounts": [],
             "schemes": [],
         }
-        self.summary: str = ""  # Will store English JSON string or full JSON
-        self.summary_hindi: str = "" # Will store Hindi summary text
+        self.summary: str = ""  # JSON string holding the structured summary
         self.image_search_query: str = ""
         self.impact_tier: str = "Medium"
         self.confidence_score: float = 0.0
@@ -129,16 +115,13 @@ class Enricher:
     def __init__(self) -> None:
         self._settings = get_settings()
 
-    async def enrich(
-        self, clean_text: str, title: str = "", country: str | None = None
-    ) -> EnrichmentResult:
+    async def enrich(self, clean_text: str, title: str = "") -> EnrichmentResult:
         """
         Summarize and classify an article.
 
         Args:
             clean_text: Cleaned article text.
             title: Headline, for additional context.
-            country: Feed scope, which decides whether Hindi is generated.
         Returns:
             EnrichmentResult with the summary and metadata.
         """
@@ -149,15 +132,13 @@ class Enricher:
         result = self._rule_based_classify(clean_text, title)
         result.confidence_score = 0.5
 
-        want_hindi = country in HINDI_COUNTRIES
-
         # Generate Summary if enabled
         if self._settings.enable_llm:
-            summary_data = await self._llm_summarize(truncated, want_hindi=want_hindi)
+            summary_data = await self._llm_summarize(truncated)
             if summary_data:
-                # Store full JSON in summary, but also extract Hindi and metadata for dedicated fields
+                # Store the structured summary as JSON, and lift the fields
+                # the feed and image resolver read directly.
                 result.summary = json.dumps(summary_data)
-                result.summary_hindi = summary_data.get("quick_take_hindi", "")
                 result.image_search_query = summary_data.get("image_search_query", "")
 
                 impact = summary_data.get("impact_tier", "Medium")
@@ -178,28 +159,25 @@ class Enricher:
             fallback_take = self._extractive_summary(clean_text)
             result.summary = json.dumps({
                 "quick_take": fallback_take,
-                "quick_take_hindi": "",
                 "key_details": [],
-                "key_details_hindi": [],
                 "impact_tier": "Medium",
                 "primary_category": result.primary_category.value,
             })
 
         return result
 
-    async def _llm_summarize(self, text: str, want_hindi: bool = False) -> dict | None:
+    async def _llm_summarize(self, text: str) -> dict | None:
         """
         Generate a structured summary using the LLM.
 
         Args:
             text: Truncated article text.
-            want_hindi: Whether to also request a Hindi translation.
         Returns:
             Dictionary of summary data, or None if the LLM was unavailable.
         """
         from govnotify.processing.llm_router import get_completion
 
-        prompt = build_prompt(text, want_hindi)
+        prompt = build_prompt(text)
 
         # Retry loop for robust extraction
         for attempt in range(MAX_SUMMARY_ATTEMPTS):
@@ -207,7 +185,8 @@ class Enricher:
                 content = await get_completion(
                     messages=[{"role": "user", "content": prompt}],
                     temperature=0.2 if attempt == 0 else 0.3,
-                    max_tokens=1500 + (attempt * 500), # Increase tokens on retry
+                    max_tokens=1500 + (attempt * 500),  # Increase tokens on retry
+                    json_mode=True,
                 )
                 
                 if not content:

@@ -139,7 +139,6 @@ async def run_ingestion():
                                 title=doc.title,
                                 clean_text=doc.clean_text,
                                 summary=doc.summary,
-                                summary_hindi=getattr(doc, "summary_hindi", ""),
                                 categories=[c.value for c in doc.categories],
                                 primary_category=doc.primary_category.value if doc.primary_category else None,
                                 regions=doc.regions,

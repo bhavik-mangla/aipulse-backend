@@ -134,9 +134,7 @@ class ProcessingPipeline:
             country = raw_doc.metadata.get("country") or DEFAULT_COUNTRY
 
             if self.enable_llm:
-                enrichment = await self.enricher.enrich(
-                    clean_text, raw_doc.title, country=country
-                )
+                enrichment = await self.enricher.enrich(clean_text, raw_doc.title)
             else:
                 # Basic rule-based enrichment if LLM disabled
                 enrichment = self.enricher.classify(clean_text, raw_doc.title)
@@ -167,7 +165,6 @@ class ProcessingPipeline:
                 title=raw_doc.title,
                 clean_text=clean_text,
                 summary=enrichment.summary,
-                summary_hindi=enrichment.summary_hindi,
                 image_url=image_url,
                 image_search_query=enrichment.image_search_query,
                 categories=enrichment.categories,

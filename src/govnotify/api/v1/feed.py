@@ -18,6 +18,7 @@ from govnotify.api.deps import get_db
 from govnotify.constants import (
     DEFAULT_COUNTRY,
     HIDE_BEFORE_DATETIME,
+    NewsCategory,
     is_valid_country,
     parse_category,
 )
@@ -100,10 +101,24 @@ def resolve_page_size(requested: int) -> int:
     return MOBILE_EFFECTIVE_PAGE_SIZE if requested == MOBILE_PAGE_SIZE else requested
 
 
+def parse_categories(value: Optional[str]) -> list[str]:
+    """
+    Split a comma-separated topic list into valid category ids.
+
+    Readers pick a set of interests rather than one topic at a time, so the
+    filter takes several. Unknown values are dropped rather than returning an
+    empty feed for a typo.
+    """
+    if not value:
+        return []
+    valid = {c.value for c in NewsCategory}
+    return [c for c in (part.strip().lower() for part in value.split(",")) if c in valid]
+
+
 def build_feed_query(
     *,
     country: str = DEFAULT_COUNTRY,
-    category: Optional[str] = None,
+    categories: Optional[list[str]] = None,
     source_id: Optional[str] = None,
     impact_level: Optional[str] = None,
     on_date: Optional[date_type] = None,
@@ -125,8 +140,8 @@ def build_feed_query(
         DocumentORM.country == country,
     )
 
-    if category:
-        stmt = stmt.where(DocumentORM.primary_category == category)
+    if categories:
+        stmt = stmt.where(DocumentORM.primary_category.in_(categories))
 
     if source_id:
         stmt = stmt.where(DocumentORM.source_id == source_id)
@@ -193,7 +208,10 @@ async def get_latest(
     page: int = Query(1, ge=1),
     page_size: int = Query(MOBILE_PAGE_SIZE, ge=1, le=100),
     country: str = Query(DEFAULT_COUNTRY, description="Feed scope: world, in, us"),
-    category: Optional[str] = None,
+    category: Optional[str] = Query(None, description="Single topic id"),
+    categories: Optional[str] = Query(
+        None, description="Comma-separated topic ids; the reader's interests"
+    ),
     source_id: Optional[str] = None,
     impact_level: Optional[str] = None,
     date: Optional[date_type] = Query(None, description="Restrict to one day (YYYY-MM-DD)"),
@@ -205,7 +223,7 @@ async def get_latest(
 
     stmt = build_feed_query(
         country=resolve_country(country),
-        category=category,
+        categories=parse_categories(categories) or parse_categories(category),
         source_id=source_id,
         impact_level=impact_level,
         on_date=date,
@@ -220,7 +238,10 @@ async def search(
     page: int = Query(1, ge=1),
     page_size: int = Query(MOBILE_PAGE_SIZE, ge=1, le=100),
     country: str = Query(DEFAULT_COUNTRY, description="Feed scope: world, in, us"),
-    category: Optional[str] = None,
+    category: Optional[str] = Query(None, description="Single topic id"),
+    categories: Optional[str] = Query(
+        None, description="Comma-separated topic ids; the reader's interests"
+    ),
     source_id: Optional[str] = None,
     impact_level: Optional[str] = None,
     date: Optional[date_type] = Query(None, description="Restrict to one day (YYYY-MM-DD)"),
@@ -232,7 +253,7 @@ async def search(
 
     stmt = build_feed_query(
         country=resolve_country(country),
-        category=category,
+        categories=parse_categories(categories) or parse_categories(category),
         source_id=source_id,
         impact_level=impact_level,
         on_date=date,
@@ -264,7 +285,6 @@ async def get_document(
         title=doc.title,
         clean_text=doc.clean_text or "",
         summary=doc.summary or "",
-        summary_hindi=doc.summary_hindi or "",
         image_url=doc.image_url,
         image_search_query=doc.image_search_query,
         categories=doc.categories or [],

@@ -39,11 +39,28 @@ class Settings(BaseSettings):
     celery_broker_url: str = "redis://redis:6379/1"
     celery_result_backend: str = "redis://redis:6379/2"
 
-    # --- LLM API Keys ---
+    # --- LLM ---
+    #
+    # "gemini" uses the hosted free tier and needs GEMINI_API_KEY.
+    # "local" talks to an OpenAI-compatible server on your machine (Ollama,
+    # LM Studio, llama.cpp) and needs no key, which is how the pipeline can be
+    # run and contributed to without anyone's quota.
+    llm_provider: str = "gemini"
     gemini_api_key: str = ""
     openai_api_key: str = ""
     anthropic_api_key: str = ""
     enable_llm: bool = True
+
+    # Local model settings, used when llm_provider is "local".
+    # Default to a small instruction-tuned model rather than a reasoning one.
+    # Reasoning models answer a request for JSON with paragraphs of visible
+    # deliberation, which costs minutes per article and parses to nothing.
+    local_llm_model: str = "llama3.2:3b"
+    local_llm_base_url: str = "http://localhost:11434"
+
+    @property
+    def use_local_llm(self) -> bool:
+        return self.llm_provider.lower() == "local"
 
     # --- Crawling ---
     crawl_user_agent: str = "GovNotify/1.0 (government notification aggregator)"

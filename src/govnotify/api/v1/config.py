@@ -14,7 +14,7 @@ from govnotify.sources.news_rss_source import NEWS_FEEDS
 
 from govnotify.constants import (
     CATEGORY_EMOJIS,
-    CATEGORY_NAMES_HI,
+    CATEGORY_NAMES,
     COUNTRIES,
     DEFAULT_COUNTRY,
     IMPACT_TIERS,
@@ -29,7 +29,6 @@ router = APIRouter()
 class CategoryMetadata(BaseModel):
     id: str
     en: str
-    hi: str
     emoji: str = ""
 
 
@@ -59,8 +58,7 @@ async def get_metadata(response: Response):
     categories = [
         CategoryMetadata(
             id=cat.value,
-            en=cat.value.replace("_", " ").title(),
-            hi=CATEGORY_NAMES_HI.get(cat.value, cat.value),
+            en=CATEGORY_NAMES["en"].get(cat.value, cat.value.title()),
             emoji=CATEGORY_EMOJIS.get(cat.value, ""),
         )
         for cat in NewsCategory

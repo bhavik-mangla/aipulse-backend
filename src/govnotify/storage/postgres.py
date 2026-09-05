@@ -82,6 +82,8 @@ class DocumentORM(Base):
     title = Column(Text, nullable=False)
     clean_text = Column(Text, nullable=True)
     summary = Column(Text, nullable=True)
+    # Retained so translations produced before Hindi was archived are not
+    # destroyed; nothing writes to it now. See archive/hindi-localisation.
     summary_hindi = Column(Text, nullable=True)
     image_url = Column(Text, nullable=True)
     image_search_query = Column(Text, nullable=True)

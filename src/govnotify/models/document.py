@@ -21,7 +21,6 @@ class ProcessedDocument(BaseModel):
     title: str
     clean_text: str = Field(description="Cleaned, normalized text content")
     summary: str = Field(default="", description="AI-generated plain-language summary")
-    summary_hindi: str = Field(default="", description="Hindi translation of summary")
     image_url: Optional[str] = Field(default=None, description="URL to a representative image")
     image_search_query: Optional[str] = Field(default=None, description="LLM-generated query for finding an image")
 

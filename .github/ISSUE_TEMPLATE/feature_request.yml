@@ -1,0 +1,26 @@
+name: Feature or idea
+description: Suggest something the project should do
+title: "[Idea] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What should it do?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Who is it for, and why does it help them?
+      description: A concrete reader situation is more persuasive than a feature name.
+    validations:
+      required: true
+  - type: textarea
+    id: cost
+    attributes:
+      label: Does this add LLM calls or new infrastructure?
+      description: |
+        The project runs on free tiers, and the Gemini free quota is the
+        binding constraint. Anything that multiplies per-article work needs a
+        plan for that. "Not sure" is a fine answer.

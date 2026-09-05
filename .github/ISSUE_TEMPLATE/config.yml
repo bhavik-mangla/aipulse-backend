@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Adding a news source
+    url: https://github.com/bhavik-mangla/aipulse-backend/blob/main/docs/adding-a-source.md
+    about: The quickest useful contribution — usually one entry in one list.
+  - name: How the system fits together
+    url: https://github.com/bhavik-mangla/aipulse-backend/blob/main/docs/architecture.md
+    about: Read this before a larger change.
